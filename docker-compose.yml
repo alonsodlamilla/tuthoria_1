@@ -1,0 +1,41 @@
+version: '3'
+services:
+  whatsapp-service:
+    build: ./whatsapp-service
+    environment:
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN}
+      - WHATSAPP_API_URL=${WHATSAPP_API_URL}
+      - OPENAI_SERVICE_URL=http://openai-service:8502
+    ports:
+      - "8501:8501"
+    depends_on:
+      - openai-service
+      
+  openai-service:
+    build: ./openai-service
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DB_HOST=postgres
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "8502:8502"
+    depends_on:
+      - postgres
+      
+  postgres:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
