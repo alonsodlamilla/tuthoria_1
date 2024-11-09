@@ -1,41 +1,50 @@
+from flask import Flask, request, jsonify
 from openai import OpenAI
-from flask import Flask, request
-from flask_cors import CORS
 import os
-from dotenv import load_dotenv
-from templates.prompts import PROMPT_TEMPLATE
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from shared.templates.prompts import PROMPT_TEMPLATE
 
-load_dotenv()
 app = Flask(__name__)
-CORS(app)
-
-# Inicializar el cliente de OpenAI
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-@app.route("/getresponsegpt", methods=["GET"])
-def get_response_gpt():
-    user_prompt = request.args.get("user_prompt")
-    user_id = request.args.get("user_id")
-    
-    print(f"Prompt recibido: {user_prompt}")
-    print(f"User ID: {user_id}")
-    
+# Diccionario para mantener el historial de conversaciones
+conversation_history = {}
+
+@app.route('/chat', methods=['POST'])
+def chat():
     try:
-        print("Intentando llamar a OpenAI...")
+        data = request.json
+        message = data.get('message')
+        user_id = data.get('user_id')  # Necesitamos el ID del usuario
+
+        # Inicializar historial si no existe
+        if user_id not in conversation_history:
+            conversation_history[user_id] = [
+                {"role": "system", "content": PROMPT_TEMPLATE}
+            ]
+
+        # Agregar mensaje del usuario al historial
+        conversation_history[user_id].append(
+            {"role": "user", "content": message}
+        )
+
+        # Obtener respuesta de OpenAI con todo el historial
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": PROMPT_TEMPLATE},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.7
+            messages=conversation_history[user_id]
         )
-        print(f"Respuesta de OpenAI: {response}")
-        return response.choices[0].message.content
+
+        # Agregar respuesta al historial
+        assistant_response = response.choices[0].message.content
+        conversation_history[user_id].append(
+            {"role": "assistant", "content": assistant_response}
+        )
+
+        return jsonify({"response": assistant_response})
     except Exception as e:
-        print(f"Error detallado: {str(e)}")
-        print(f"Tipo de error: {type(e)}")
-        return f"Lo siento, hubo un error al procesar tu mensaje: {str(e)}"
+        print(f"Error en chat: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(port=8000, debug=True) 
+    app.run(host="0.0.0.0", port=8000) 
