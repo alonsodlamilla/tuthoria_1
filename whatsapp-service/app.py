@@ -11,19 +11,26 @@ app = Flask(__name__)
 def send_message_to_openai(message, number):
     """Envía el mensaje a OpenAI y obtiene la respuesta"""
     try:
+        # Detectar tipo de mensaje
+        message_type = "number" if message.strip().isdigit() else "text"
+        
+        openai_url = os.getenv('OPENAI_SERVICE_URL')
+        
         response = requests.post(
-            f"{os.getenv('OPENAI_SERVICE_URL')}/chat",
+            f"{openai_url}/chat",
             json={
                 "message": message,
-                "user_id": number  # Enviamos el número como ID de usuario
+                "user_id": number,
+                "message_type": message_type
             }
         )
+        
         if response.status_code == 200:
             return response.json()['response']
         else:
             raise Exception(f"Error del servicio OpenAI: {response.text}")
     except Exception as e:
-        print(f"Error llamando a OpenAI service: {str(e)}")
+        print(f"Error en send_message_to_openai: {str(e)}")
         return "Lo siento, hubo un error. ¿Podemos intentar nuevamente?"
 
 def whatsapp_service(body):
