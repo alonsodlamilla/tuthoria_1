@@ -10,19 +10,31 @@ load_dotenv()
 
 class SheetsManager:
     def __init__(self):
-        scope = ['https://spreadsheets.google.com/feeds',
+        try:
+            # Obtener credenciales desde variable de entorno
+            google_creds = os.getenv('GOOGLE_SHEETS_CREDENTIALS_FILE')
+            if not google_creds:
+                raise ValueError("No se encontraron las credenciales en GOOGLE_SHEETS_CREDENTIALS_FILE")
+            
+            # Crear archivo temporal con las credenciales
+            credentials_path = '/tmp/google_credentials.json'
+            with open(credentials_path, 'w') as f:
+                f.write(google_creds)
+            
+            print(f"Credenciales temporales creadas en: {credentials_path}")
+            
+            credentials = ServiceAccountCredentials.from_json_keyfile_name(
+                credentials_path,
+                ['https://spreadsheets.google.com/feeds',
                  'https://www.googleapis.com/auth/drive']
-        
-        # Construir la ruta de manera dinámica
-        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        credentials_path = os.path.join(base_path, "openai_service", "credentials", "tuthoria-8d846ad64571.json")
-        print(f"Intentando cargar credenciales desde: {credentials_path}")
-        
-        credentials = ServiceAccountCredentials.from_json_keyfile_name(
-            credentials_path, scope)
-        
-        self.client = gspread.authorize(credentials)
-        self.sheet = self.client.open(os.getenv('GOOGLE_SHEETS_NAME')).sheet1
+            )
+            
+            self.client = gspread.authorize(credentials)
+            self.sheet = self.client.open(os.getenv('GOOGLE_SHEETS_NAME')).sheet1
+            
+        except Exception as e:
+            print(f"Error al cargar credenciales: {str(e)}")
+            raise
 
     def log_conversation(self, user_id, role, message, message_type, 
                         tokens_used, response_time, model_version, 
