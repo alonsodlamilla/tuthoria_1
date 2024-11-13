@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import requests
 import sys
 import logging
+from utils.sheets_manager import SheetsManager
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
