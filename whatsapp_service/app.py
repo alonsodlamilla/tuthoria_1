@@ -111,23 +111,29 @@ def send_message_to_openai(message, number):
         # Recuperar historial reciente
         recent_history = sheets.get_conversation_history(number, limit=20)
         
-        # Construir el contexto
+        # Construir el contexto siempre empezando con el PROMPT_TEMPLATE
         messages = [
             {"role": "system", "content": PROMPT_TEMPLATE}
         ]
         
-        # Añadir historial reciente
-        for msg in reversed(recent_history):
-            messages.append({
-                "role": msg['role'],
-                "content": msg['message']
-            })
-            
+        # Añadir historial reciente en orden cronológico
+        for msg in recent_history:  # Ya no necesitamos reversed() porque get_conversation_history devuelve en orden correcto
+            role = msg['role']
+            content = msg['message']
+            # Solo añadir si role es válido y el contenido no está vacío
+            if role in ['user', 'assistant'] and content.strip():
+                messages.append({
+                    "role": role,
+                    "content": content
+                })
+        
         # Añadir mensaje actual
         messages.append({
             "role": "user",
             "content": message
         })
+        
+        logger.info(f"Enviando {len(messages)} mensajes a OpenAI para usuario {number}")
         
         # Llamar a OpenAI con todo el contexto
         response = client.chat.completions.create(
@@ -135,10 +141,23 @@ def send_message_to_openai(message, number):
             messages=messages
         )
         
-        return response.choices[0].message.content
+        assistant_response = response.choices[0].message.content
+        
+        # Registrar la respuesta en el historial
+        sheets.log_conversation(
+            user_id=number,
+            role="assistant",
+            message=assistant_response,
+            message_type="text",
+            tokens_used=response.usage.total_tokens,
+            response_time=0,  # Podemos añadir el cálculo del tiempo si es necesario
+            model_version="gpt-4o"
+        )
+        
+        return assistant_response
         
     except Exception as e:
-        print(f"Error en send_message_to_openai: {str(e)}")
+        logger.error(f"Error en send_message_to_openai: {str(e)}")
         return "Lo siento, hubo un error. ¿Podemos intentar nuevamente?"
 
 def whatsapp_service(body):
