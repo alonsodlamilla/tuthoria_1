@@ -4,7 +4,7 @@ import psycopg2
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationSummaryBufferMemory
-from .templates.prompts import TEMPLATES
+from shared.templates.prompts import TEMPLATES
 
 app = Flask(__name__)
 
@@ -69,7 +69,7 @@ def get_response_gpt():
     )
     
     # Inicializar OpenAI y memoria (se mantiene igual)
-    llm = OpenAI(model_name="gpt-4", api_key=OPENAI_API_KEY)
+    llm = OpenAI(model_name="gpt-4o", api_key=OPENAI_API_KEY)
     memory = ConversationSummaryBufferMemory(
         llm=llm,
         memory_key="chat_history",
