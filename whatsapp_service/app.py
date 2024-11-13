@@ -113,19 +113,21 @@ def send_message_to_openai(message, number):
         # Recuperar historial reciente
         recent_history = sheets.get_conversation_history(number, limit=20)
         logger.info(f"Historial recuperado: {len(recent_history)} mensajes")
+        logger.info(f"Contenido del historial: {recent_history}")
         
         # Construir el contexto
         messages = [
             {"role": "system", "content": PROMPT_TEMPLATE}
         ]
         
-        # Añadir historial reciente en orden cronológico
+        # Añadir historial reciente
         for msg in recent_history:
             messages.append({
                 "role": msg['role'],
                 "content": msg['message']
             })
         logger.info(f"Mensajes construidos: {len(messages)} mensajes totales")
+        logger.info(f"Contenido de messages: {messages}")
             
         # Añadir mensaje actual
         messages.append({
@@ -146,6 +148,7 @@ def send_message_to_openai(message, number):
         logger.info("Respuesta recibida de OpenAI")
         
         assistant_response = response.choices[0].message.content
+        logger.info(f"Respuesta del asistente: {assistant_response}")
         
         # Registrar la respuesta en el historial
         conversation_id = sheets.log_conversation(
@@ -155,14 +158,14 @@ def send_message_to_openai(message, number):
             message_type="text",
             tokens_used=response.usage.total_tokens,
             response_time=0,
-            model_version="gpt-4o",
-            conversation_id=conversation_id
+            model_version="gpt-4o"
         )
         
         return assistant_response
         
     except Exception as e:
         logger.error(f"Error detallado en send_message_to_openai: {str(e)}", exc_info=True)
+        logger.error(f"Traceback completo:", exc_info=True)
         return "Lo siento, hubo un error. ¿Podemos intentar nuevamente?"
 
 def whatsapp_service(body):
