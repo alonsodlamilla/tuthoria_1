@@ -22,7 +22,7 @@ def chat():
         message = data.get('message')
         user_id = data.get('user_id')
         message_type = data.get('message_type', 'text')
-        model = "gpt-3.5-turbo"
+        model = "gpt-4o"
 
         # Inicializar historial si no existe
         if user_id not in conversation_history:
