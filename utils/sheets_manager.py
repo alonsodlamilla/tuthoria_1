@@ -5,6 +5,10 @@ import uuid
 import time
 import os
 from dotenv import load_dotenv
+import logging
+
+# Configurar logging
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -21,7 +25,7 @@ class SheetsManager:
             with open(credentials_path, 'w') as f:
                 f.write(google_creds)
             
-            print(f"Credenciales temporales creadas en: {credentials_path}")
+            logger.info(f"Credenciales temporales creadas en: {credentials_path}")
             
             credentials = ServiceAccountCredentials.from_json_keyfile_name(
                 credentials_path,
@@ -33,7 +37,7 @@ class SheetsManager:
             self.sheet = self.client.open(os.getenv('GOOGLE_SHEETS_NAME')).sheet1
             
         except Exception as e:
-            print(f"Error al cargar credenciales: {str(e)}")
+            logger.error(f"Error al cargar credenciales: {str(e)}")
             raise
 
     def log_conversation(self, user_id, role, message, message_type, 
