@@ -2,12 +2,10 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-COPY app.py /app
-COPY Dockerfile /app
-COPY requirements.txt /app
+COPY . .
 
 RUN pip install -r requirements.txt
 
-EXPOSE 8501
+ENV PORT=8501
 
-CMD [ "python", "app.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "app:app"]
