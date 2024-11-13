@@ -103,25 +103,36 @@ def chat():
         return jsonify({"error": str(e)}), 500
 
 def send_message_to_openai(message, number):
-    """Envía el mensaje a OpenAI y obtiene la respuesta"""
     try:
-        # Detectar tipo de mensaje
-        message_type = "number" if message.strip().isdigit() else "text"
+        # Recuperar historial reciente
+        recent_history = sheets.get_conversation_history(number, limit=20)
         
-        # Hacer la llamada directamente a la función chat
-        data = {
-            "message": message,
-            "user_id": number,
-            "message_type": message_type
-        }
+        # Construir el contexto
+        messages = [
+            {"role": "system", "content": PROMPT_TEMPLATE}
+        ]
         
-        # Simular una request a la función chat
-        with app.test_request_context('/chat', method='POST', json=data):
-            response = chat()
-            if isinstance(response, tuple):
-                return "Lo siento, hubo un error. ¿Podemos intentar nuevamente?"
-            return response.json['response']
+        # Añadir historial reciente
+        for msg in reversed(recent_history):
+            messages.append({
+                "role": msg['role'],
+                "content": msg['message']
+            })
             
+        # Añadir mensaje actual
+        messages.append({
+            "role": "user",
+            "content": message
+        })
+        
+        # Llamar a OpenAI con todo el contexto
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages
+        )
+        
+        return response.choices[0].message.content
+        
     except Exception as e:
         print(f"Error en send_message_to_openai: {str(e)}")
         return "Lo siento, hubo un error. ¿Podemos intentar nuevamente?"
