@@ -19,6 +19,9 @@ sheets = SheetsManager()
 # Diccionario para mantener el historial de conversaciones
 conversation_history = {}
 
+# Set para almacenar IDs de mensajes procesados
+processed_messages = set()
+
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
@@ -178,6 +181,12 @@ def webhook():
             
             if 'messages' in value:
                 message = value['messages'][0]
+                # Verificar si el mensaje ya fue procesado
+                message_id = message.get('id')
+                if message_id in processed_messages:
+                    return "OK", 200
+                
+                processed_messages.add(message_id)
                 number = message['from']
                 message_body = message['text']['body']
                 
