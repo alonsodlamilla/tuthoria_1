@@ -5,7 +5,9 @@ from dotenv import load_dotenv
 import requests
 import sys
 import logging
+import time
 from utils.sheets_manager import SheetsManager
+from shared.templates.prompts import PROMPT_TEMPLATE
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -74,7 +76,7 @@ def chat():
             user_id=user_id,
             role="assistant",
             message=assistant_response,
-            message_type=message_type,  # Usar el mismo tipo que el usuario
+            message_type=message_type,
             response_time=response_time,
             tokens_used=response.usage.total_tokens,
             model_version=model,
