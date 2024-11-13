@@ -15,7 +15,7 @@ class SheetsManager:
         
         # Construir la ruta de manera dinámica
         base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        credentials_path = os.path.join(base_path, "openai-service", "credentials", "tuthoria-8d846ad64571.json")
+        credentials_path = os.path.join(base_path, "openai_service", "credentials", "tuthoria-8d846ad64571.json")
         print(f"Intentando cargar credenciales desde: {credentials_path}")
         
         credentials = ServiceAccountCredentials.from_json_keyfile_name(
