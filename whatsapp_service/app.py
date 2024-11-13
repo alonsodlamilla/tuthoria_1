@@ -29,6 +29,9 @@ def chat():
         message_type = data.get('message_type', 'text')
         model = "gpt-4o"
 
+        # Recuperar historial de Sheets
+        recent_history = sheets.get_conversation_history(user_id, limit=20)
+
         # Inicializar historial si no existe
         if user_id not in conversation_history:
             conversation_history[user_id] = [

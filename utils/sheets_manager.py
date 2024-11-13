@@ -56,3 +56,22 @@ class SheetsManager:
         
         self.sheet.append_row(row)
         return conversation_id
+
+    def get_conversation_history(self, user_id, limit=20):
+        """Recupera los últimos mensajes de un usuario"""
+        try:
+            # Obtener todas las filas
+            all_rows = self.sheet.get_all_records()
+            
+            # Filtrar por user_id y ordenar por fecha
+            user_messages = [
+                row for row in all_rows 
+                if row['user_id'] == user_id
+            ]
+            user_messages.sort(key=lambda x: x['timestamp'], reverse=True)
+            
+            # Retornar los últimos 'limit' mensajes
+            return user_messages[:limit]
+        except Exception as e:
+            print(f"Error al recuperar historial: {str(e)}")
+            return []
