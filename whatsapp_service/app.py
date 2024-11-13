@@ -4,10 +4,11 @@ import os
 from dotenv import load_dotenv
 import requests
 import sys
-import time
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from shared.templates.prompts import PROMPT_TEMPLATE
-from utils.sheets_manager import SheetsManager
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Cargar variables de entorno
 load_dotenv()
@@ -181,9 +182,11 @@ def webhook():
     elif request.method == "POST":
         try:
             data = request.get_json()
-            if 'entry' not in data:
+            if not data:
+                logger.error("No se recibieron datos")
                 return "OK", 200
                 
+            logger.info("Procesando webhook")
             entry = data['entry'][0]
             if 'changes' not in entry:
                 return "OK", 200
@@ -216,8 +219,8 @@ def webhook():
                     
             return "OK", 200
         except Exception as e:
-            print(f"Error en webhook: {str(e)}")
-            return str(e), 400
+            logger.error(f"Error crítico en webhook: {str(e)}")
+            return "Error interno", 500
 
 @app.route("/test", methods=["GET"])
 def test():
