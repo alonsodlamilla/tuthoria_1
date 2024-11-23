@@ -1,3 +1,4 @@
+-- Tabla para almacenar el estado actual de cada usuario
 CREATE TABLE user_states (
     user_id VARCHAR(255) PRIMARY KEY,
     current_state VARCHAR(50) NOT NULL DEFAULT 'INICIO',
@@ -7,6 +8,7 @@ CREATE TABLE user_states (
     last_interaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabla para almacenar el historial de conversaciones
 CREATE TABLE conversation_history (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
@@ -16,6 +18,7 @@ CREATE TABLE conversation_history (
     FOREIGN KEY (user_id) REFERENCES user_states(user_id)
 );
 
+-- Tabla para almacenar los templates de sesiones
 CREATE TABLE session_templates (
     id SERIAL PRIMARY KEY,
     tipo VARCHAR(50) NOT NULL,
