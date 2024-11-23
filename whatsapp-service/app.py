@@ -5,6 +5,7 @@ import requests
 import logging
 import time
 from utils.sheets_manager import SheetsManager
+from shared.templates import PROMPT_TEMPLATE
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
