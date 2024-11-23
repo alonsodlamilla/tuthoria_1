@@ -1,0 +1,15 @@
+version: '3'
+services:
+  whatsapp-service:
+    volumes:
+      - ./whatsapp-service:/app
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      
+  openai-service:
+    volumes:
+      - ./openai-service:/app
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1 
