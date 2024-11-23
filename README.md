@@ -85,7 +85,7 @@ docker-compose up --build
 
 2. Solo para desarrollo:
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.override.yml up
+docker compose -f compose.yml -f compose.override.yml up
 ```
 
 3. Detener los servicios:
