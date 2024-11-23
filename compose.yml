@@ -1,0 +1,43 @@
+version: '3'
+services:
+  whatsapp-service:
+    build: ./whatsapp-service
+    env_file:
+      - ./whatsapp-service/.env
+    ports:
+      - "8501:8501"
+    depends_on:
+      - openai-service
+      
+  openai-service:
+    build: ./openai-service
+    env_file:
+      - ./openai-service/.env
+      - ./.env
+    ports:
+      - "8502:8502"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    env_file:
+      - ./.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
