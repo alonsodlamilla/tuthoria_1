@@ -4,16 +4,47 @@ Este proyecto implementa un chatbot para WhatsApp utilizando la API de WhatsApp 
 
 ## Arquitectura del Proyecto
 
-El sistema se compone de varios componentes clave que trabajan en conjunto para proporcionar una experiencia interactiva a través de WhatsApp:
+El sistema está compuesto por tres servicios principales:
 
-- Flask Server: Maneja las peticiones HTTP y sirve como el punto de conexión entre WhatsApp y el motor de IA.
-- API de WhatsApp Business: Permite recibir y enviar mensajes a través de WhatsApp.
-- OpenAI API: Se utiliza para generar respuestas inteligentes a partir de las preguntas recibidas.
-- Google Cloud Storage: Almacena y gestiona los vectores de palabras para la IA.
+- **WhatsApp Service**: Maneja las peticiones HTTP de WhatsApp y sirve como punto de entrada para los mensajes.
+- **OpenAI Service**: Procesa los mensajes usando GPT-4 y mantiene el historial de conversaciones.
+- **PostgreSQL**: Almacena datos de conversaciones y configuraciones.
 
-Cuando un mensaje llega a través de WhatsApp, Flask procesa la solicitud, la pasa a la API de OpenAI para generar una respuesta y luego utiliza la API de WhatsApp Business para enviar esta respuesta al usuario.
 
-![Arquitectura WhatsApp AI Chatbot](whatsapp-ai-chatbot-arquitectura.png)
+Los servicios están containerizados usando Docker y se comunican entre sí de manera segura.
+
+![Arquitectura WhatsApp AI Chatbot](docs/architecture.png)
+
+### Estructura del Proyecto
+
+```bash
+.
+├── compose.override.yml     # Configuración de desarrollo
+├── compose.yml             # Configuración principal de Docker
+├── config/                 # Configuraciones del proyecto
+│   └── sheets_config.py    # Configuración de Google Sheets
+├── db/                     # Scripts de base de datos
+│   └── init.sql           # Inicialización de PostgreSQL
+├── ngrok-v3-stable-windows-amd64/  # Cliente ngrok para desarrollo local
+│   └── ngrok.exe
+├── openai-service/         # Servicio de OpenAI
+│   ├── app.py             # Aplicación principal Flask
+│   ├── Dockerfile         # Configuración de contenedor
+│   ├── langchainService.py # Servicios de LangChain
+│   ├── requirements.txt    # Dependencias completas
+│   └── shared/            # Código compartido del servicio
+│       └── templates/     # Plantillas de prompts
+├── shared/                # Código compartido global
+│   └── templates/        # Plantillas compartidas
+│       └── prompts.py    # Definición de prompts
+├── utils/                # Utilidades generales
+│   └── sheets_manager.py # Gestor de Google Sheets
+└── whatsapp-service/     # Servicio de WhatsApp
+    ├── app.py           # Aplicación principal Flask
+    ├── Dockerfile       # Configuración de contenedor
+    └── handlers/        # Manejadores de eventos
+        └── prompt_handler.py # Procesamiento de prompts
+```
 
 ### Requisitos Previos
 
@@ -23,22 +54,44 @@ Para ejecutar este proyecto necesitas:
 - Una cuenta de desarrollador de Facebook con acceso a la API de WhatsApp Business.
 - Acceso a la API de OpenAI.
 
-### Configuración del Proyecto
+### Configuración del Entorno
 
-Variables de Entorno: Configura las siguientes variables de entorno en tu sistema o en un archivo .env:
+El proyecto utiliza archivos .env separados para cada servicio:
 
-- WHATSAPP_ACCESS_TOKEN: Tu token de acceso para la API de WhatsApp Business.
-- WHATSAPP_VERIFY_TOKEN: Tu token de verificación para la API de WhatsApp Business.
-- WHATSAPP_API_URL: La URL de la API de WhatsApp Business.
-- OPENAI_SERVICE_URL: La URL de tu servicio que interactúa con la API de OpenAI.
-- GOOGLE_APPLICATION_CREDENTIALS: La ruta al archivo de credenciales de tu cuenta de Google Cloud.
+1. WhatsApp Service (.env):
+   - PORT
+   - WHATSAPP_VERIFY_TOKEN
+   - WHATSAPP_ACCESS_TOKEN
+   - WHATSAPP_API_URL
+   - WHATSAPP_NUMBER_ID
+   - OPENAI_SERVICE_URL
 
-**Instalación de Dependencias: Ejecuta pip install -r requirements.txt para instalar las dependencias necesarias.**
+2. OpenAI Service (.env):
+   - PORT
+   - OPENAI_API_KEY
+   - DB_HOST
+   - DB_NAME
+   - DB_USER
+   - DB_PASSWORD
+   - GOOGLE_SHEETS_CREDENTIALS_FILE
+   - GOOGLE_SHEETS_NAME
 
-#### Ejecución Local:
+### Ejecución con Docker
 
-- Inicia el servidor Flask con python app.py.
-- Asegúrate de que los puertos y las URLs de callback estén configurados correctamente en tus servicios de WhatsApp y OpenAI.
+1. Construir y ejecutar los servicios:
+```bash
+docker-compose up --build
+```
+
+2. Solo para desarrollo:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml up
+```
+
+3. Detener los servicios:
+```bash
+docker compose down
+```
 
 #### Despliegue
 
