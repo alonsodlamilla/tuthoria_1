@@ -8,6 +8,9 @@ services:
       - "8501:8501"
     depends_on:
       - openai-service
+    volumes:
+      - ./utils:/app/utils
+      - ./shared:/app/shared
       
   openai-service:
     build: ./openai-service
@@ -19,6 +22,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./utils:/app/utils
+      - ./shared:/app/shared
       
   postgres:
     image: postgres:13

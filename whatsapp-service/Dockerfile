@@ -6,8 +6,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Copy the rest of the application
+# Copy the entire project structure
 COPY . .
+COPY ../utils /app/utils
+COPY ../shared /app/shared
 
 # Add the project root to PYTHONPATH
 ENV PYTHONPATH=/app
