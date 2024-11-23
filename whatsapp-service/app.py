@@ -1,13 +1,10 @@
 from flask import Flask, request, jsonify
-from openai import OpenAI
 import os
 from dotenv import load_dotenv
 import requests
-import sys
 import logging
 import time
 from utils.sheets_manager import SheetsManager
-from shared.templates.prompts import PROMPT_TEMPLATE
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +14,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = Flask(__name__)
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 sheets = SheetsManager()
 
 # Diccionario para mantener el historial de conversaciones
@@ -25,6 +21,30 @@ conversation_history = {}
 
 # Set para almacenar IDs de mensajes procesados
 processed_messages = set()
+
+def send_message_to_openai(message, number):
+    try:
+        openai_service_url = os.getenv('OPENAI_SERVICE_URL')
+        if not openai_service_url:
+            raise ValueError("OPENAI_SERVICE_URL not configured")
+            
+        response = requests.post(
+            f"{openai_service_url}/chat",
+            json={
+                "message": message,
+                "user_id": number
+            }
+        )
+        
+        if response.status_code == 200:
+            return response.json()["response"]
+        else:
+            logger.error(f"Error from OpenAI service: {response.text}")
+            return "Lo siento, hubo un error al procesar tu mensaje."
+            
+    except Exception as e:
+        logger.error(f"Error in send_message_to_openai: {str(e)}")
+        return "Lo siento, hubo un error. ¿Podemos intentar nuevamente?"
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -105,68 +125,6 @@ def chat():
                 conversation_id=conversation_id
             )
         return jsonify({"error": str(e)}), 500
-
-def send_message_to_openai(message, number):
-    try:
-        logger.info(f"Iniciando send_message_to_openai para número {number}")
-        
-        # Recuperar historial reciente
-        recent_history = sheets.get_conversation_history(number, limit=20)
-        logger.info(f"Historial recuperado: {len(recent_history)} mensajes")
-        logger.info(f"Contenido del historial: {recent_history}")
-        
-        # Construir el contexto
-        messages = [
-            {"role": "system", "content": PROMPT_TEMPLATE}
-        ]
-        
-        # Añadir historial reciente
-        for msg in recent_history:
-            messages.append({
-                "role": msg['role'],
-                "content": msg['message']
-            })
-        logger.info(f"Mensajes construidos: {len(messages)} mensajes totales")
-        logger.info(f"Contenido de messages: {messages}")
-            
-        # Añadir mensaje actual
-        messages.append({
-            "role": "user",
-            "content": message
-        })
-        
-        # Llamar a OpenAI con todo el contexto
-        logger.info("Llamando a OpenAI...")
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            temperature=0.7,
-            presence_penalty=0.6,
-            frequency_penalty=0.2,
-            max_tokens=1000
-        )
-        logger.info("Respuesta recibida de OpenAI")
-        
-        assistant_response = response.choices[0].message.content
-        logger.info(f"Respuesta del asistente: {assistant_response}")
-        
-        # Registrar la respuesta en el historial
-        conversation_id = sheets.log_conversation(
-            user_id=number,
-            role="assistant",
-            message=assistant_response,
-            message_type="text",
-            tokens_used=response.usage.total_tokens,
-            response_time=0,
-            model_version="gpt-4o"
-        )
-        
-        return assistant_response
-        
-    except Exception as e:
-        logger.error(f"Error detallado en send_message_to_openai: {str(e)}", exc_info=True)
-        logger.error(f"Traceback completo:", exc_info=True)
-        return "Lo siento, hubo un error. ¿Podemos intentar nuevamente?"
 
 def whatsapp_service(body):
     """Envía mensaje a WhatsApp"""
