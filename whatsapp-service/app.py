@@ -72,10 +72,7 @@ def chat():
         )
 
         # Obtener respuesta de OpenAI
-        response = client.chat.completions.create(
-            model=model,
-            messages=conversation_history[user_id]
-        )
+        response = send_message_to_openai(message, user_id)
 
         # Registrar mensaje del usuario
         conversation_id = sheets.log_conversation(
@@ -91,7 +88,7 @@ def chat():
         # Calcular tiempo y registrar respuesta
         response_time = time.time() - start_time
         assistant_response = response.choices[0].message.content
-        
+
         # Registrar respuesta del asistente usando el mismo message_type
         sheets.log_conversation(
             user_id=user_id,
