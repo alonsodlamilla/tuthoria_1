@@ -10,3 +10,4 @@ instance/
 venv/
 *.db
 credentials/
+*.json
