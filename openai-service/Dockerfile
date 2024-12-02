@@ -12,4 +12,4 @@ COPY . .
 # Add the project root to PYTHONPATH
 ENV PYTHONPATH=/app
 
-CMD ["python", "langchainService.py"]
+CMD uvicorn app:app --host 0.0.0.0 --port $PORT
