@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 import logging
 import psycopg2
 from psycopg2.extras import DictCursor
+from pymongo import MongoClient
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -22,15 +24,11 @@ class DBService:
         }
 
         # MongoDB config
-        self.mongo_config = {
-            "host": os.getenv("MONGO_HOST", "mongodb"),
-            "port": int(os.getenv("MONGO_PORT", 27017)),
-            "username": os.getenv("MONGO_USER", "admin"),
-            "password": os.getenv("MONGO_PASSWORD", "secret123"),
-        }
-
-        # Validate configurations
-        self._validate_config()
+        mongo_uri = f"mongodb://{os.getenv('MONGO_USER')}:{os.getenv('MONGO_PASSWORD')}@{os.getenv('MONGO_HOST')}:{os.getenv('MONGO_PORT')}/"
+        self.mongo_client = MongoClient(mongo_uri)
+        self.mongo_db = self.mongo_client.openai_service
+        self.conversations = self.mongo_db.conversations
+        self.user_states = self.mongo_db.user_states
 
     def _validate_config(self):
         """Validate required environment variables"""
@@ -55,37 +53,25 @@ class DBService:
             raise
 
     async def get_user_state(self, user_id: str) -> Tuple[str, Dict[str, str]]:
-        """Get user state and context from PostgreSQL"""
+        """Get user state and context from MongoDB"""
         try:
-            with self.get_pg_connection() as conn:
-                with conn.cursor(cursor_factory=DictCursor) as cur:
-                    cur.execute(
-                        """
-                        SELECT current_state, anio, curso, seccion 
-                        FROM user_states 
-                        WHERE user_id = %s
-                        """,
-                        (user_id,),
-                    )
-                    data = cur.fetchone()
+            state_doc = self.user_states.find_one({"user_id": user_id})
 
-                    if not data:
-                        cur.execute(
-                            """
-                            INSERT INTO user_states (user_id, current_state) 
-                            VALUES (%s, 'INICIO') 
-                            RETURNING current_state
-                            """,
-                            (user_id,),
-                        )
-                        conn.commit()
-                        return "INICIO", {}
+            if not state_doc:
+                new_state = {
+                    "user_id": user_id,
+                    "current_state": "INICIO",
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                }
+                self.user_states.insert_one(new_state)
+                return "INICIO", {}
 
-                    return data["current_state"], {
-                        "anio": data["anio"],
-                        "curso": data["curso"],
-                        "seccion": data["seccion"],
-                    }
+            return state_doc["current_state"], {
+                "anio": state_doc.get("anio"),
+                "curso": state_doc.get("curso"),
+                "seccion": state_doc.get("seccion"),
+            }
         except Exception as e:
             logger.error(f"Error in get_user_state: {str(e)}")
             raise
@@ -93,46 +79,54 @@ class DBService:
     async def update_user_state(
         self, user_id: str, state: str, context: Dict[str, str]
     ) -> None:
-        """Update user state and context in PostgreSQL"""
+        """Update user state and context in MongoDB"""
         try:
-            with self.get_pg_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        UPDATE user_states 
-                        SET current_state = %s, 
-                            anio = %s, 
-                            curso = %s, 
-                            seccion = %s
-                        WHERE user_id = %s
-                        """,
-                        (
-                            state,
-                            context.get("anio"),
-                            context.get("curso"),
-                            context.get("seccion"),
-                            user_id,
-                        ),
-                    )
-                    conn.commit()
+            update_data = {
+                "current_state": state,
+                "updated_at": datetime.utcnow(),
+                **context,
+            }
+
+            self.user_states.update_one(
+                {"user_id": user_id}, {"$set": update_data}, upsert=True
+            )
         except Exception as e:
             logger.error(f"Error in update_user_state: {str(e)}")
             raise
 
     async def log_conversation(self, user_id: str, message: str, response: str) -> None:
-        """Log conversation to PostgreSQL history"""
+        """Log conversation to MongoDB"""
         try:
-            with self.get_pg_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        INSERT INTO conversation_history 
-                        (user_id, message, response, created_at) 
-                        VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-                        """,
-                        (user_id, message, response),
-                    )
-                    conn.commit()
+            conversation_doc = {
+                "user_id": user_id,
+                "message": message,
+                "response": response,
+                "created_at": datetime.utcnow(),
+                "model": "gpt-4",  # You might want to make this configurable
+                "metadata": {
+                    "source": "openai_service",
+                    "type": "chat",
+                },
+            }
+
+            self.conversations.insert_one(conversation_doc)
         except Exception as e:
             logger.error(f"Error in log_conversation: {str(e)}")
+            raise
+
+    async def get_conversation_history(
+        self, user_id: str, limit: int = 10
+    ) -> list[Dict]:
+        """Get conversation history from MongoDB"""
+        try:
+            return list(
+                self.conversations.find(
+                    {"user_id": user_id},
+                    {"_id": 0, "message": 1, "response": 1, "created_at": 1},
+                )
+                .sort("created_at", -1)
+                .limit(limit)
+            )
+        except Exception as e:
+            logger.error(f"Error in get_conversation_history: {str(e)}")
             raise
