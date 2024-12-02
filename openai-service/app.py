@@ -2,15 +2,18 @@ import logging
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 import os
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from services.chat_service import ChatService
 from services.db_service import DBService
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+app = FastAPI(
+    title="OpenAI Service", description="AI Chat Service with state management"
+)
 chat_service = ChatService()
 db_service = DBService()
 
@@ -22,6 +25,12 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+
+
+class ConversationHistory(BaseModel):
+    message: str
+    response: str
+    created_at: datetime
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -77,6 +86,17 @@ async def get_response_gpt(
 
     except Exception as e:
         logger.error(f"Error in get_response_gpt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/history/{user_id}", response_model=List[ConversationHistory])
+async def get_history(user_id: str, limit: int = Query(10, ge=1, le=100)):
+    """Get conversation history for a user"""
+    try:
+        history = await db_service.get_conversation_history(user_id, limit)
+        return history
+    except Exception as e:
+        logger.error(f"Error getting history: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
