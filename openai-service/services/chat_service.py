@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any
 import os
 import logging
 from openai import OpenAI
-from langchain.llms import OpenAI as LangchainOpenAI
+from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationSummaryBufferMemory
 from shared.templates import TEMPLATES
@@ -21,7 +21,7 @@ class ChatService:
             api_key=api_key,
             http_client=httpx.Client(),
         )
-        self.llm = LangchainOpenAI(
+        self.llm = ChatOpenAI(
             model_name="gpt-4",
             api_key=api_key,
         )
