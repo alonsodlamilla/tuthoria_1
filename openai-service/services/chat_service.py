@@ -6,15 +6,24 @@ from langchain.llms import OpenAI as LangchainOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationSummaryBufferMemory
 from shared.templates import TEMPLATES
+import httpx
 
 logger = logging.getLogger(__name__)
 
 
 class ChatService:
     def __init__(self):
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
+
+        self.client = OpenAI(
+            api_key=api_key,
+            http_client=httpx.Client(),
+        )
         self.llm = LangchainOpenAI(
-            model_name="gpt-4", api_key=os.getenv("OPENAI_API_KEY")
+            model_name="gpt-4",
+            api_key=api_key,
         )
         self.conversation_history = {}
 
