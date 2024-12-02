@@ -12,4 +12,4 @@ COPY . .
 # Add the project root to PYTHONPATH
 ENV PYTHONPATH=/app
 
-CMD gunicorn --bind "0.0.0.0:$PORT" app:app
+CMD uvicorn app:app --host 0.0.0.0 --port $PORT
