@@ -2,8 +2,6 @@ from typing import Optional, Tuple, Dict
 import os
 from dotenv import load_dotenv
 import logging
-import psycopg2
-from psycopg2.extras import DictCursor
 from pymongo import MongoClient
 from datetime import datetime
 
@@ -15,14 +13,6 @@ logger = logging.getLogger(__name__)
 
 class DBService:
     def __init__(self):
-        # PostgreSQL config
-        self.pg_config = {
-            "host": os.getenv("DB_HOST", "postgres"),
-            "database": os.getenv("DB_NAME", "docente_bot"),
-            "user": os.getenv("DB_USER", "postgres"),
-            "password": os.getenv("DB_PASSWORD", "secret"),
-        }
-
         # MongoDB config
         mongo_uri = f"mongodb://{os.getenv('MONGO_USER')}:{os.getenv('MONGO_PASSWORD')}@{os.getenv('MONGO_HOST')}:{os.getenv('MONGO_PORT')}/"
         self.mongo_client = MongoClient(mongo_uri)
@@ -30,27 +20,17 @@ class DBService:
         self.conversations = self.mongo_db.conversations
         self.user_states = self.mongo_db.user_states
 
+        # Validate configuration
+        self._validate_config()
+
     def _validate_config(self):
         """Validate required environment variables"""
-        required_vars = {
-            "PostgreSQL": ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD"],
-            "MongoDB": ["MONGO_HOST", "MONGO_PORT", "MONGO_USER", "MONGO_PASSWORD"],
-        }
-
-        for service, vars in required_vars.items():
-            missing = [var for var in vars if not os.getenv(var)]
-            if missing:
-                logger.warning(
-                    f"Missing {service} environment variables: {', '.join(missing)}"
-                )
-
-    def get_pg_connection(self):
-        """Get PostgreSQL connection"""
-        try:
-            return psycopg2.connect(**self.pg_config)
-        except Exception as e:
-            logger.error(f"Error connecting to PostgreSQL: {str(e)}")
-            raise
+        required_vars = ["MONGO_HOST", "MONGO_PORT", "MONGO_USER", "MONGO_PASSWORD"]
+        missing = [var for var in required_vars if not os.getenv(var)]
+        if missing:
+            logger.warning(
+                f"Missing MongoDB environment variables: {', '.join(missing)}"
+            )
 
     async def get_user_state(self, user_id: str) -> Tuple[str, Dict[str, str]]:
         """Get user state and context from MongoDB"""
