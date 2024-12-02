@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, Request, HTTPException
 import os
 from dotenv import load_dotenv
 import requests
@@ -6,6 +6,8 @@ import logging
 import time
 from pymongo import MongoClient
 from shared.templates import PROMPT_TEMPLATE
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -14,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Cargar variables de entorno
 load_dotenv()
 
-app = Flask(__name__)
+app = FastAPI()
 
 # MongoDB setup
 mongo_uri = f"mongodb://{os.getenv('MONGO_USER')}:{os.getenv('MONGO_PASSWORD')}@{os.getenv('MONGO_HOST')}:{os.getenv('MONGO_PORT')}/"
@@ -27,6 +29,23 @@ conversation_history = {}
 
 # Set para almacenar IDs de mensajes procesados
 processed_messages = set()
+
+
+# Pydantic models
+class ChatRequest(BaseModel):
+    message: str
+    user_id: str
+    message_type: Optional[str] = "text"
+
+
+class ChatResponse(BaseModel):
+    response: str
+
+
+class WhatsAppVerification(BaseModel):
+    hub_mode: Optional[str] = None
+    hub_verify_token: Optional[str] = None
+    hub_challenge: Optional[str] = None
 
 
 def send_message_to_openai(message, number):
@@ -95,14 +114,36 @@ def get_conversation_history(user_id, limit=20):
         return []
 
 
-@app.route("/chat", methods=["POST"])
-def chat():
+def whatsapp_service(body):
+    """Envía mensaje a WhatsApp"""
+    try:
+        token = os.getenv("WHATSAPP_ACCESS_TOKEN")
+        api_url = os.getenv("WHATSAPP_API_URL")
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+
+        response = requests.post(api_url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"Error en WhatsApp API: {response.text}")
+            return None
+    except Exception as e:
+        print(f"Error en whatsapp_service: {str(e)}")
+        return None
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
     try:
         start_time = time.time()
-        data = request.json
-        message = data.get("message")
-        user_id = data.get("user_id")
-        message_type = data.get("message_type", "text")
+        message = request.message
+        user_id = request.user_id
+        message_type = request.message_type
         model = "gpt-4"
 
         # Obtener historial reciente de MongoDB
@@ -160,7 +201,7 @@ def chat():
             {"role": "assistant", "content": assistant_response}
         )
 
-        return jsonify({"response": assistant_response})
+        return {"response": assistant_response}
 
     except Exception as e:
         logger.error(f"Error en chat: {str(e)}")
@@ -180,96 +221,73 @@ def chat():
                 model_version=model,
                 conversation_id=conversation_id,
             )
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-def whatsapp_service(body):
-    """Envía mensaje a WhatsApp"""
+@app.get("/whatsapp")
+async def webhook_verify(
+    hub_mode: str = None, hub_verify_token: str = None, hub_challenge: str = None
+):
+    if hub_mode and hub_verify_token:
+        if hub_mode == "subscribe" and hub_verify_token == "ASJROFDWDOERK":
+            logger.info("WEBHOOK_VERIFIED")
+            return int(hub_challenge)
+        raise HTTPException(status_code=403, detail="Forbidden")
+    raise HTTPException(status_code=400, detail="Invalid verification request")
+
+
+@app.post("/whatsapp")
+async def webhook(request: Request):
     try:
-        token = os.getenv("WHATSAPP_ACCESS_TOKEN")
-        api_url = os.getenv("WHATSAPP_API_URL")
+        data = await request.json()
+        if not data:
+            logger.error("No se recibieron datos")
+            return "OK"
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {token}",
-        }
+        logger.info("Procesando webhook")
+        entry = data["entry"][0]
+        if "changes" not in entry:
+            return "OK"
 
-        response = requests.post(api_url, headers=headers, json=body)
+        value = entry["changes"][0]["value"]
 
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print(f"Error en WhatsApp API: {response.text}")
-            return None
+        if "messages" in value:
+            message = value["messages"][0]
+            # Verificar si el mensaje ya fue procesado
+            message_id = message.get("id")
+            if message_id in processed_messages:
+                return "OK"
+
+            processed_messages.add(message_id)
+            number = message["from"]
+            message_body = message["text"]["body"]
+
+            # Obtener respuesta de OpenAI
+            response = send_message_to_openai(message_body, number)
+
+            # Enviar respuesta por WhatsApp
+            body = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": number,
+                "type": "text",
+                "text": {"body": response},
+            }
+            whatsapp_service(body)
+
+        return "OK"
     except Exception as e:
-        print(f"Error en whatsapp_service: {str(e)}")
-        return None
+        logger.error(f"Error crítico en webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error interno")
 
 
-@app.route("/whatsapp", methods=["GET", "POST"])
-def webhook():
-    if request.method == "GET":
-        mode = request.args.get("hub.mode")
-        token = request.args.get("hub.verify_token")
-        challenge = request.args.get("hub.challenge")
-
-        if mode and token:
-            if mode == "subscribe" and token == "ASJROFDWDOERK":
-                print("WEBHOOK_VERIFIED")
-                return str(challenge)
-            else:
-                return "Forbidden", 403
-        return "Invalid verification request", 400
-
-    elif request.method == "POST":
-        try:
-            data = request.get_json()
-            if not data:
-                logger.error("No se recibieron datos")
-                return "OK", 200
-
-            logger.info("Procesando webhook")
-            entry = data["entry"][0]
-            if "changes" not in entry:
-                return "OK", 200
-
-            value = entry["changes"][0]["value"]
-
-            if "messages" in value:
-                message = value["messages"][0]
-                # Verificar si el mensaje ya fue procesado
-                message_id = message.get("id")
-                if message_id in processed_messages:
-                    return "OK", 200
-
-                processed_messages.add(message_id)
-                number = message["from"]
-                message_body = message["text"]["body"]
-
-                # Obtener respuesta de OpenAI
-                response = send_message_to_openai(message_body, number)
-
-                # Enviar respuesta por WhatsApp
-                body = {
-                    "messaging_product": "whatsapp",
-                    "recipient_type": "individual",
-                    "to": number,
-                    "type": "text",
-                    "text": {"body": response},
-                }
-                whatsapp_service(body)
-
-            return "OK", 200
-        except Exception as e:
-            logger.error(f"Error crítico en webhook: {str(e)}")
-            return "Error interno", 500
-
-
-@app.route("/test", methods=["GET"])
-def test():
-    return "API funcionando!", 200
+@app.get("/test")
+async def test():
+    return "API funcionando!"
 
 
 if __name__ == "__main__":
+    import uvicorn
+
     port = int(os.getenv("PORT", 8501))
-    app.run(host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
