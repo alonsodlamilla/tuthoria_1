@@ -12,6 +12,8 @@ services:
     volumes:
       - ./utils:/app/utils
       - ./shared:/app/shared
+    environment:
+      - PORT=8501
       
   openai-service:
     build: ./openai-service
@@ -28,6 +30,8 @@ services:
     volumes:
       - ./utils:/app/utils
       - ./shared:/app/shared
+    environment:
+      - PORT=8502
       
   mongodb:
     image: mongo:latest

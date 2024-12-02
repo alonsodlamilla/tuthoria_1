@@ -1,50 +1,107 @@
-from flask import Flask, request, jsonify
-from openai import OpenAI
+import logging
+from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel
 import os
-import sys
-import time
-from shared.templates import TEMPLATES
-from utils.sheets_manager import SheetsManager
+from typing import Optional, Dict, List
+from services.chat_service import ChatService
+from services.db_service import DBService
+from datetime import datetime
 
-app = Flask(__name__)
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-sheets = SheetsManager()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Diccionario para mantener el historial de conversaciones
-conversation_history = {}
+app = FastAPI(
+    title="OpenAI Service", description="AI Chat Service with state management"
+)
+chat_service = ChatService()
+db_service = DBService()
 
-@app.route('/chat', methods=['POST'])
-def chat():
+
+class ChatRequest(BaseModel):
+    message: str
+    user_id: str
+
+
+class ChatResponse(BaseModel):
+    response: str
+
+
+class ConversationHistory(BaseModel):
+    message: str
+    response: str
+    created_at: datetime
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    """Simple chat endpoint using GPT-4"""
     try:
-        data = request.json
-        message = data.get('message')
-        user_id = data.get('user_id')
-        
-        if user_id not in conversation_history:
-            conversation_history[user_id] = [
-                {"role": "system", "content": TEMPLATES["default"]}
-            ]
-        
-        conversation_history[user_id].append(
-            {"role": "user", "content": message}
-        )
-
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=conversation_history[user_id]
-        )
-
-        assistant_response = response.choices[0].message.content
-        
-        conversation_history[user_id].append(
-            {"role": "assistant", "content": assistant_response}
-        )
-
-        return jsonify({"response": assistant_response})
+        response = await chat_service.get_completion(request.message, request.user_id)
+        await db_service.log_conversation(request.user_id, request.message, response)
+        return {"response": response}
     except Exception as e:
-        print(f"Error in chat: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error in chat: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/getresponsegpt", response_model=ChatResponse)
+async def get_response_gpt(
+    user_prompt: str = Query(..., description="User's input prompt"),
+    user_id: str = Query(..., description="User's ID"),
+):
+    """Advanced chat endpoint with state management using LangChain"""
+    try:
+        # Get current state and context
+        current_state, context = await db_service.get_user_state(user_id)
+
+        # Get response using LangChain
+        response = await chat_service.get_langchain_response(
+            user_prompt, current_state, context
+        )
+
+        # Update state based on response
+        new_context = context.copy()
+        if current_state == "INICIO" and any(
+            str(i) in user_prompt for i in range(1, 6)
+        ):
+            new_context["anio"] = f"{user_prompt}° año"
+            await db_service.update_user_state(user_id, "SELECCION_CURSO", new_context)
+        elif current_state == "SELECCION_CURSO" and any(
+            str(i) in user_prompt for i in range(1, 5)
+        ):
+            cursos = {
+                "1": "Matemática",
+                "2": "Comunicación",
+                "3": "Ciencias",
+                "4": "Historia",
+            }
+            new_context["curso"] = cursos.get(user_prompt[0])
+            await db_service.update_user_state(user_id, "SESION_FINAL", new_context)
+
+        # Log conversation
+        await db_service.log_conversation(user_id, user_prompt, response)
+
+        return {"response": response}
+
+    except Exception as e:
+        logger.error(f"Error in get_response_gpt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/history/{user_id}", response_model=List[ConversationHistory])
+async def get_history(user_id: str, limit: int = Query(10, ge=1, le=100)):
+    """Get conversation history for a user"""
+    try:
+        history = await db_service.get_conversation_history(user_id, limit)
+        return history
+    except Exception as e:
+        logger.error(f"Error getting history: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 8502))
-    app.run(host='0.0.0.0', port=port)
+    import uvicorn
+
+    port = int(os.environ.get("PORT", 8502))
+    uvicorn.run(app, host="0.0.0.0", port=port)
