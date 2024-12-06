@@ -1,12 +1,11 @@
 from typing import Optional, Dict, Any
 import os
 import logging
-from openai import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationSummaryBufferMemory
+from langchain.schema import SystemMessage, HumanMessage, AIMessage
 from shared.templates import TEMPLATES
-import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +16,6 @@ class ChatService:
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
 
-        self.client = OpenAI(
-            api_key=api_key,
-            http_client=httpx.Client(),
-        )
         self.llm = ChatOpenAI(
             model_name="gpt-4",
             api_key=api_key,
@@ -28,24 +23,20 @@ class ChatService:
         self.conversation_history = {}
 
     async def get_completion(self, message: str, user_id: str) -> str:
-        """Simple GPT-4 completion"""
+        """Simple GPT-4 completion using LangChain"""
         try:
             if user_id not in self.conversation_history:
                 self.conversation_history[user_id] = [
-                    {"role": "system", "content": TEMPLATES["default"]}
+                    SystemMessage(content=TEMPLATES["default"])
                 ]
 
-            self.conversation_history[user_id].append(
-                {"role": "user", "content": message}
-            )
+            self.conversation_history[user_id].append(HumanMessage(content=message))
 
-            response = self.client.chat.completions.create(
-                model="gpt-4", messages=self.conversation_history[user_id]
-            )
+            response = self.llm.predict_messages(self.conversation_history[user_id])
 
-            assistant_response = response.choices[0].message.content
+            assistant_response = response.content
             self.conversation_history[user_id].append(
-                {"role": "assistant", "content": assistant_response}
+                AIMessage(content=assistant_response)
             )
 
             return assistant_response

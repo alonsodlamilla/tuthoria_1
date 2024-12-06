@@ -19,8 +19,6 @@ services:
     build: ./openai-service
     env_file:
       - ./openai-service/.env
-      - ./openai-service/.env.development
-      - ./.env
     ports:
       - "8502:8502"
     depends_on:
@@ -39,8 +37,8 @@ services:
     volumes:
       - mongodb_data:/data/db
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=secret123
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
       interval: 10s

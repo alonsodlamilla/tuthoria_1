@@ -105,3 +105,22 @@ Si tienes ideas, preguntas o deseas discutir sobre las posibilidades de la IA y 
 - GitHub: [https://github.com/albertgilopez](https://github.com/albertgilopez)
 - LinkedIn: Albert Gil López: [https://www.linkedin.com/in/albertgilopez/](https://www.linkedin.com/in/albertgilopez/)
 - Inteligencia Artificial Generativa (IAG) en español: [https://www.codigollm.es/](https://www.codigollm.es/)
+
+## Build Optimization
+
+The OpenAI service uses a multi-stage Docker build to minimize the final image size. Build times are optimized through:
+
+- Multi-stage builds to separate build dependencies from runtime
+- Wheel caching for Python packages
+- Minimal base image (python:3.10-slim)
+- Separation of dev dependencies
+
+To build for development:
+```bash
+docker build -t openai-service:dev .
+```
+
+For production with minimal image:
+```bash
+docker build --target production -t openai-service:prod .
+```
