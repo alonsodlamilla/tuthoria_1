@@ -1,11 +1,13 @@
 import logging
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import os
 from typing import Optional, Dict, List
 from services.chat_service import ChatService
 from services.db_service import DBService
 from datetime import datetime
+
+from shared.templates.prompts import TEMPLATES
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +33,17 @@ class ConversationHistory(BaseModel):
     message: str
     response: str
     created_at: datetime
+
+
+class SessionRequest(BaseModel):
+    modalidad: str = Field(..., description="Modalidad educativa")
+    nivel_educativo: str = Field(..., description="Nivel educativo")
+    grado: str = Field(..., description="Grado")
+    area_curricular: str = Field(..., description="Área curricular")
+    competencia: str = Field(..., description="Competencia")
+    capacidades: str = Field(..., description="Capacidades")
+    tema: str = Field(..., description="Tema de la sesión")
+    duracion: str = Field(..., description="Duración de la sesión")
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -97,6 +110,40 @@ async def get_history(user_id: str, limit: int = Query(10, ge=1, le=100)):
         return history
     except Exception as e:
         logger.error(f"Error getting history: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/generate", response_model=ChatResponse)
+async def generate_session(request: SessionRequest):
+    """Generate a learning session based on educational context"""
+    try:
+        # Format the prompt with context
+        formatted_prompt = TEMPLATES["session_template"].format(
+            modalidad=request.modalidad,
+            nivel=request.nivel_educativo,
+            grado=request.grado,
+            area=request.area_curricular,
+            competencia=request.competencia,
+            capacidades=request.capacidades,
+            tema=request.tema,
+            duracion=request.duracion,
+        )
+
+        # Get response using GPT-4
+        response = await chat_service.get_completion(
+            formatted_prompt, "session_generator"
+        )
+
+        # Log the session generation
+        await db_service.log_conversation(
+            user_id="session_generator",
+            message=formatted_prompt,
+            response=response,
+        )
+
+        return {"response": response}
+    except Exception as e:
+        logger.error(f"Error generating session: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

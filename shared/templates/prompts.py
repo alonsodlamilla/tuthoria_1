@@ -23,7 +23,28 @@ TEMPLATES = {
     "SESION_FINAL": """
         Para {curso} de {anio}, generaré una sesión de aprendizaje.
         Por favor, indícame el tema específico que deseas desarrollar.
-    """
+    """,
+    "session_template": """
+    Genera una sesión de aprendizaje detallada con el siguiente contexto:
+    
+    Modalidad: {modalidad}
+    Nivel Educativo: {nivel}
+    Grado: {grado}
+    Área Curricular: {area}
+    Competencia: {competencia}
+    Capacidades: {capacidades}
+    Tema: {tema}
+    Duración: {duracion}
+    
+    La sesión debe incluir:
+    1. Propósito de aprendizaje
+    2. Momentos de la sesión (inicio, desarrollo, cierre)
+    3. Actividades específicas
+    4. Materiales necesarios
+    5. Evaluación
+    
+    Por favor, estructura la respuesta de manera clara y organizada.
+    """,
 }
 
-__all__ = ['PROMPT_TEMPLATE', 'TEMPLATES']
+__all__ = ["PROMPT_TEMPLATE", "TEMPLATES"]
