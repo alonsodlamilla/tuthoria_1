@@ -14,11 +14,12 @@ services:
       - ./shared:/app/shared
     environment:
       - PORT=8501
-      
+
   openai-service:
     build: ./openai-service
     env_file:
       - ./openai-service/.env
+      - ./openai-service/.env.development
       - ./.env
     ports:
       - "8502:8502"
@@ -32,7 +33,7 @@ services:
       - ./shared:/app/shared
     environment:
       - PORT=8502
-      
+
   mongodb:
     image: mongo:latest
     ports:
@@ -47,7 +48,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-      
+
   postgres:
     image: postgres:13
     environment:

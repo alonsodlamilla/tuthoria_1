@@ -4,33 +4,38 @@ from dotenv import load_dotenv
 import logging
 from pymongo import MongoClient
 from datetime import datetime
-
-# Load environment variables
-load_dotenv()
+from config.database import get_database_settings
 
 logger = logging.getLogger(__name__)
 
 
 class DBService:
     def __init__(self):
-        # MongoDB config
-        mongo_uri = f"mongodb://{os.getenv('MONGO_USER')}:{os.getenv('MONGO_PASSWORD')}@{os.getenv('MONGO_HOST')}:{os.getenv('MONGO_PORT')}/"
-        self.mongo_client = MongoClient(mongo_uri)
-        self.mongo_db = self.mongo_client.openai_service
+        # Get database settings
+        self.settings = get_database_settings()
+
+        # Initialize MongoDB connection
+        self.mongo_client = MongoClient(
+            self.settings.mongodb_uri, serverSelectionTimeoutMS=5000  # 5 second timeout
+        )
+        self.mongo_db = self.mongo_client[self.settings.MONGO_DB_NAME]
         self.conversations = self.mongo_db.conversations
         self.user_states = self.mongo_db.user_states
 
-        # Validate configuration
-        self._validate_config()
+        # Verify connection
+        self._verify_connection()
 
-    def _validate_config(self):
-        """Validate required environment variables"""
-        required_vars = ["MONGO_HOST", "MONGO_PORT", "MONGO_USER", "MONGO_PASSWORD"]
-        missing = [var for var in required_vars if not os.getenv(var)]
-        if missing:
-            logger.warning(
-                f"Missing MongoDB environment variables: {', '.join(missing)}"
+    def _verify_connection(self):
+        """Verify MongoDB connection"""
+        try:
+            # The ismaster command is cheap and does not require auth
+            self.mongo_client.admin.command("ismaster")
+            logger.info(
+                f"Successfully connected to MongoDB ({self.settings.ENVIRONMENT})"
             )
+        except Exception as e:
+            logger.error(f"MongoDB connection failed: {str(e)}")
+            raise
 
     async def get_user_state(self, user_id: str) -> Tuple[str, Dict[str, str]]:
         """Get user state and context from MongoDB"""
