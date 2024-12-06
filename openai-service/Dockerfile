@@ -4,25 +4,40 @@ FROM python:3.10-slim as builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Final stage
-FROM python:3.10-slim
+# Development stage
+FROM builder as development
+
+# Install development dependencies
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Copy application code
+COPY . .
+
+# Production stage
+FROM python:3.10-slim as production
 
 WORKDIR /app
 
-# Copy wheels from builder stage
-COPY --from=builder /app/wheels /wheels
-COPY --from=builder /app/requirements.txt .
+# Install curl for healthcheck
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies from wheels
-RUN pip install --no-cache /wheels/*
+# Copy only necessary files from builder
+COPY --from=builder /usr/local/lib/python3.10/site-packages/ /usr/local/lib/python3.10/site-packages/
+COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 # Copy application code
 COPY . .

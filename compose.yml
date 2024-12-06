@@ -1,22 +1,35 @@
 version: '3'
 services:
   whatsapp-service:
-    build: ./whatsapp-service
+    build:
+      context: ./whatsapp-service
+      cache_from:
+        - whatsapp-service:latest
     env_file:
       - ./whatsapp-service/.env
     ports:
       - "8501:8501"
     depends_on:
-      - openai-service
-      - mongodb
+      openai-service:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
     volumes:
-      - ./utils:/app/utils
-      - ./shared:/app/shared
+      - ./utils:/app/utils:ro
+      - ./shared:/app/shared:ro
     environment:
       - PORT=8501
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   openai-service:
-    build: ./openai-service
+    build:
+      context: ./openai-service
+      cache_from:
+        - openai-service:latest
     env_file:
       - ./openai-service/.env
     ports:
@@ -25,10 +38,15 @@ services:
       mongodb:
         condition: service_healthy
     volumes:
-      - ./utils:/app/utils
-      - ./shared:/app/shared
+      - ./utils:/app/utils:ro
+      - ./shared:/app/shared:ro
     environment:
       - PORT=8502
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8502/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   mongodb:
     image: mongo:latest
