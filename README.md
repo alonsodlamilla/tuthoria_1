@@ -50,7 +50,6 @@ Los servicios están containerizados usando Docker y se comunican entre sí de m
 
 Para ejecutar este proyecto necesitas:
 
-- Una cuenta de Google Cloud para el almacenamiento de vectores.
 - Una cuenta de desarrollador de Facebook con acceso a la API de WhatsApp Business.
 - Acceso a la API de OpenAI.
 
@@ -73,8 +72,6 @@ El proyecto utiliza archivos .env separados para cada servicio:
    - DB_NAME
    - DB_USER
    - DB_PASSWORD
-   - GOOGLE_SHEETS_CREDENTIALS_FILE
-   - GOOGLE_SHEETS_NAME
 
 ### Ejecución con Docker
 
