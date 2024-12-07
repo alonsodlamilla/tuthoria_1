@@ -20,7 +20,7 @@ class Database:
         if not all([mongodb_user, mongodb_password, mongodb_host]):
             raise ValueError("Missing MongoDB credentials in environment variables")
         
-        return f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}?retryWrites=true&w=majority"
+        return f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}/{cls.db_name}?retryWrites=true&w=majority"
 
 async def connect_to_database():
     """Connect to MongoDB database."""

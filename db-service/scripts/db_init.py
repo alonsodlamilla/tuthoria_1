@@ -14,12 +14,13 @@ async def init_db():
         mongodb_user = os.getenv("MONGODB_USER")
         mongodb_password = os.getenv("MONGODB_PASSWORD")
         mongodb_host = os.getenv("MONGODB_HOST")
+        db_name = "chat_db"
         
         if not all([mongodb_user, mongodb_password, mongodb_host]):
             raise ValueError("Missing MongoDB credentials in environment variables")
         
         # Construct MongoDB URI
-        mongo_uri = f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}?retryWrites=true&w=majority"
+        mongo_uri = f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}/{db_name}?retryWrites=true&w=majority"
         
         # Connect to MongoDB
         logger.info("Connecting to MongoDB...")
@@ -30,7 +31,7 @@ async def init_db():
         logger.success("Successfully connected to MongoDB")
         
         # Get database
-        db = client.chat_db
+        db = client[db_name]
         logger.info(f"Using database: {db.name}")
         
         # List existing collections
