@@ -19,7 +19,7 @@ class DatabaseSettings(BaseSettings):
     DB_SERVICE_URL: str = "http://db-service:8000/api/v1"
 
     class Config:
-        env_file = f".env.{os.getenv('ENVIRONMENT', 'development').lower()}"
+        env_file = ".env"
         case_sensitive = True
 
 
