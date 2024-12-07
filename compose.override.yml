@@ -6,18 +6,16 @@ services:
     volumes:
       - ./whatsapp-service:/app:cached
     environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
+      - DEBUG=1
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
-      
+
   openai-service:
     build:
       target: development
     volumes:
       - ./openai-service:/app:cached
     environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
+      - DEBUG=1
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1

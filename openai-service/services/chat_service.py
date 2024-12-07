@@ -1,86 +1,57 @@
-from typing import Optional, Dict, Any
 import os
+import openai
+from typing import Dict, Tuple
 import logging
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts import PromptTemplate
-from langchain.memory import ConversationSummaryBufferMemory
-from langchain.schema import SystemMessage, HumanMessage, AIMessage
-from shared.templates import TEMPLATES
 
 logger = logging.getLogger(__name__)
 
-
 class ChatService:
     def __init__(self):
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        self.model = "gpt-4"
 
-        self.llm = ChatOpenAI(
-            model_name="gpt-4",
-            api_key=api_key,
-        )
-        self.conversation_history = {}
-
-    async def get_completion(self, message: str, user_id: str) -> str:
-        """Simple GPT-4 completion using LangChain"""
-        try:
-            if user_id not in self.conversation_history:
-                self.conversation_history[user_id] = [
-                    SystemMessage(content=TEMPLATES["default"])
-                ]
-
-            self.conversation_history[user_id].append(HumanMessage(content=message))
-
-            response = self.llm.predict_messages(self.conversation_history[user_id])
-
-            assistant_response = response.content
-            self.conversation_history[user_id].append(
-                AIMessage(content=assistant_response)
-            )
-
-            return assistant_response
-        except Exception as e:
-            logger.error(f"Error in get_completion: {str(e)}")
-            raise
-
-    async def get_langchain_response(
-        self, user_prompt: str, current_state: str, context: Dict[str, Any]
+    async def process_message(
+        self,
+        message: str,
+        current_state: str,
+        context: Dict[str, str]
     ) -> str:
-        """LangChain-based response with state management"""
+        """Process a message using OpenAI's GPT-4"""
         try:
-            template = TEMPLATES.get(current_state, TEMPLATES["INICIO"])
-
-            if isinstance(template, str):
-                template = template.format(
-                    anio=context.get("anio") or "{anio}",
-                    curso=context.get("curso") or "{curso}",
-                    seccion=context.get("seccion") or "{seccion}",
-                )
-
-            prompt = PromptTemplate(
-                input_variables=["current_state", "chat_history", "human_input"],
-                template=template,
+            # Create system message based on state and context
+            system_message = self._create_system_message(current_state, context)
+            
+            # Create the messages array for the chat
+            messages = [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": message}
+            ]
+            
+            # Call OpenAI API
+            response = await openai.ChatCompletion.acreate(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=1000
             )
-
-            memory = ConversationSummaryBufferMemory(
-                llm=self.llm,
-                memory_key="chat_history",
-                input_key="human_input",
-                max_token_limit=2000,
-            )
-
-            response = self.llm.generate(
-                [
-                    prompt.format(
-                        current_state=current_state,
-                        chat_history=memory.buffer,
-                        human_input=user_prompt,
-                    )
-                ]
-            )
-
-            return response.generations[0][0].text
+            
+            return response.choices[0].message.content
         except Exception as e:
-            logger.error(f"Error in get_langchain_response: {str(e)}")
+            logger.error(f"Error in process_message: {str(e)}")
             raise
+
+    def _create_system_message(self, current_state: str, context: Dict[str, str]) -> str:
+        """Create a system message based on the current state and context"""
+        base_message = "You are a helpful AI assistant."
+        
+        if current_state == "INICIO":
+            return f"{base_message} You are helping a student choose their academic year."
+        elif current_state == "SELECCION_CURSO":
+            year = context.get("anio", "unknown year")
+            return f"{base_message} You are helping a {year} student choose their course."
+        elif current_state == "SESION_FINAL":
+            year = context.get("anio", "unknown year")
+            course = context.get("curso", "unknown course")
+            return f"{base_message} You are helping a {year} student with their {course} course."
+        
+        return base_message

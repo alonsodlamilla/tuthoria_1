@@ -2,9 +2,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Response, status
 from loguru import logger
 
-from .routes import conversation
-from .database import connect_to_database, close_database_connection, Database
-from .utils.logging import setup_logging
+from routes import conversation
+from database import connect_to_database, close_database_connection, Database
+from utils.logging import setup_logging
 
 
 @asynccontextmanager

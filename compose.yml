@@ -2,21 +2,29 @@ version: '3.8'
 
 services:
   whatsapp-service:
-    build: ./whatsapp-service
+    build:
+      context: ./whatsapp-service
+      target: production
     ports:
       - "8501:8501"
     env_file:
       - ./whatsapp-service/.env
+    volumes:
+      - ./shared:/app/shared:ro
     depends_on:
       - openai-service
       - db-service
 
   openai-service:
-    build: ./openai-service
+    build:
+      context: ./openai-service
+      target: production
     ports:
       - "8502:8502"
     env_file:
       - ./openai-service/.env
+    volumes:
+      - ./shared:/app/shared:ro
     depends_on:
       - db-service
 
