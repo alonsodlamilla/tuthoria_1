@@ -91,11 +91,13 @@ async def webhook_verify(
 @app.post("/whatsapp")
 async def webhook(request: Request):
     try:
+        # Parse incoming webhook data
         data = await request.json()
         if not data:
-            logger.error("No se recibieron datos")
+            logger.error("No data received")
             return "OK"
 
+        # Extract message details
         entry = data["entry"][0]
         if "changes" not in entry:
             return "OK"
@@ -107,24 +109,39 @@ async def webhook(request: Request):
         message = value["messages"][0]
         message_id = message.get("id")
 
+        # Check for duplicate messages
         if webhook_handler.is_message_processed(message_id):
             return "OK"
 
         webhook_handler.mark_message_processed(message_id)
-        number = message["from"]
-        message_body = message["text"]["body"]
+        user_id = message["from"]
+        message_text = message["text"]["body"]
 
-        # Get response from OpenAI
-        response = await chat_service.send_message_to_openai(message_body, number)
+        try:
+            # 1. Store incoming message in DB
+            await chat_service.store_message(user_id, message_text, is_user=True)
 
-        # Send WhatsApp response
-        message_data = webhook_handler.create_message_body(number, response)
-        webhook_handler.send_whatsapp_message(message_data)
+            # 2. Send to OpenAI service for processing
+            response = await chat_service.send_message_to_openai(message_text, user_id)
+            
+            # 3. Send WhatsApp response
+            message_data = webhook_handler.create_message_body(user_id, response)
+            webhook_handler.send_whatsapp_message(message_data)
 
-        return "OK"
+            return "OK"
+        except Exception as e:
+            logger.error(f"Error processing message: {str(e)}")
+            # Send error message to user
+            error_data = webhook_handler.create_message_body(
+                user_id,
+                "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta nuevamente."
+            )
+            webhook_handler.send_whatsapp_message(error_data)
+            return "OK"
+
     except Exception as e:
-        logger.error(f"Error crítico en webhook: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error interno")
+        logger.error(f"Critical error in webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal error")
 
 
 @app.get("/test")
