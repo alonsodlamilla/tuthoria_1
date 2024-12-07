@@ -21,20 +21,21 @@ async def init_db():
             raise ValueError("Missing MongoDB credentials in environment variables")
         
         # Construct MongoDB URI
-        mongo_uri = f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}/{db_name}?retryWrites=true&w=majority&tls=true&tlsAllowInvalidCertificates=true"
+        mongo_uri = f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}/{db_name}?retryWrites=true&w=majority"
         
-        # Create SSL context
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
+        # Create TLS/SSL configuration
+        tls_config = {
+            "tls": True,
+            "tlsAllowInvalidCertificates": True,
+            "tlsInsecure": True
+        }
         
         # Connect to MongoDB
         logger.info("Connecting to MongoDB...")
         client = AsyncIOMotorClient(
             mongo_uri,
             serverSelectionTimeoutMS=5000,  # 5 second timeout
-            ssl_cert_reqs=ssl.CERT_NONE,
-            ssl=True
+            **tls_config
         )
         
         # Test connection
