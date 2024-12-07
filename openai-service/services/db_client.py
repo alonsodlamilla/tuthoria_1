@@ -21,42 +21,6 @@ class DBClient:
             await self.session.close()
             self.session = None
 
-    async def get_user_state(self, user_id: str) -> Tuple[str, Dict[str, str]]:
-        """Get user state and context from DB service"""
-        try:
-            await self._ensure_session()
-            async with self.session.get(f"{self.base_url}/conversations/{user_id}/state") as response:
-                if response.status == 404:
-                    return "INICIO", {}
-                response.raise_for_status()
-                data = await response.json()
-                return data["current_state"], {
-                    "anio": data.get("anio"),
-                    "curso": data.get("curso"),
-                    "seccion": data.get("seccion"),
-                }
-        except Exception as e:
-            logger.error(f"Error in get_user_state: {str(e)}")
-            raise
-
-    async def update_user_state(self, user_id: str, state: str, context: Dict[str, str]) -> None:
-        """Update user state and context via DB service"""
-        try:
-            await self._ensure_session()
-            update_data = {
-                "current_state": state,
-                "updated_at": datetime.utcnow().isoformat(),
-                **context
-            }
-            async with self.session.put(
-                f"{self.base_url}/conversations/{user_id}/state",
-                json=update_data
-            ) as response:
-                response.raise_for_status()
-        except Exception as e:
-            logger.error(f"Error in update_user_state: {str(e)}")
-            raise
-
     async def log_conversation(self, user_id: str, message: str, response: str) -> None:
         """Log conversation via DB service"""
         try:

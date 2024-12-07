@@ -1,10 +1,12 @@
 import os
-from typing import Dict
+from typing import Dict, List
 import logging
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains import LLMChain
-from langchain.memory import ConversationBufferMemory
+from db_service.client import DBClient
+from shared.templates.prompts import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -17,46 +19,34 @@ class ChatService:
             max_tokens=1000,
             api_key=os.getenv("OPENAI_API_KEY")
         )
+        self.db_client = DBClient()
         
-        # Initialize conversation memory
-        self.memories = {}
+        # Initialize prompt template with external system prompt
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", SYSTEM_PROMPT),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}")
+        ])
 
     async def process_message(
         self,
         message: str,
-        current_state: str,
         context: Dict[str, str]
     ) -> str:
         """Process a message using LangChain"""
         try:
-            # Get or create memory for this conversation
-            memory = self.memories.get(context.get('user_id'))
-            if not memory:
-                memory = ConversationBufferMemory(
-                    memory_key="chat_history",
-                    return_messages=True
-                )
-                self.memories[context.get('user_id')] = memory
+            # Get conversation history from DB service
+            history = await self.db_client.get_conversation_history(context.get('user_id'))
             
-            # Create system message based on state and context
-            system_template = self._create_system_message(current_state, context)
+            # Process with LangChain
+            response = await self._process_with_langchain(message, history, context)
             
-            # Create prompt template
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", system_template),
-                ("human", "{input}"),
-            ])
-            
-            # Create chain
-            chain = LLMChain(
-                llm=self.llm,
-                prompt=prompt,
-                memory=memory,
-                verbose=True
+            # Let DB service handle storage
+            await self.db_client.log_conversation(
+                context.get('user_id'),
+                message,
+                response
             )
-            
-            # Run chain
-            response = await chain.arun(input=message)
             
             return response
             
@@ -64,18 +54,40 @@ class ChatService:
             logger.error(f"Error in process_message: {str(e)}")
             raise
 
-    def _create_system_message(self, current_state: str, context: Dict[str, str]) -> str:
-        """Create a system message based on the current state and context"""
-        base_message = "You are a helpful AI assistant."
-        
-        if current_state == "INICIO":
-            return f"{base_message} You are helping a student choose their academic year."
-        elif current_state == "SELECCION_CURSO":
-            year = context.get("anio", "unknown year")
-            return f"{base_message} You are helping a {year} student choose their course."
-        elif current_state == "SESION_FINAL":
-            year = context.get("anio", "unknown year")
-            course = context.get("curso", "unknown course")
-            return f"{base_message} You are helping a {year} student with their {course} course."
-        
-        return base_message
+    async def _process_with_langchain(
+        self,
+        message: str,
+        history: List[BaseMessage],
+        context: Dict[str, str]
+    ) -> str:
+        """Process a message with conversation history using LangChain"""
+        try:
+            # Create chain
+            chain = LLMChain(
+                llm=self.llm,
+                prompt=self.prompt,
+                verbose=True
+            )
+            
+            # Format history into messages
+            chat_history = []
+            for msg in history:
+                if isinstance(msg, dict):  # Handle history from DB
+                    if msg.get("role") == "user":
+                        chat_history.append(HumanMessage(content=msg["content"]))
+                    elif msg.get("role") == "assistant":
+                        chat_history.append(AIMessage(content=msg["content"]))
+                else:  # Handle BaseMessage objects
+                    chat_history.append(msg)
+
+            # Run chain
+            response = await chain.ainvoke({
+                "chat_history": chat_history,
+                "input": message
+            })
+            
+            return response["text"]
+            
+        except Exception as e:
+            logger.error(f"Error in _process_with_langchain: {str(e)}")
+            raise

@@ -29,17 +29,13 @@ class Message(BaseModel):
 @app.post("/chat")
 async def chat_endpoint(message: Message):
     try:
-        # Get user state and context
-        current_state, context = await db_client.get_user_state(message.user_id)
+        # Get context
+        context = await db_client.get_context(message.user_id)
         
-        # Update context with new values if provided
-        if message.context:
-            context.update(message.context)
         
         # Process message with ChatService
         response = await chat_service.process_message(
             message.content,
-            current_state,
             context
         )
         
@@ -49,14 +45,7 @@ async def chat_endpoint(message: Message):
             message.content,
             response
         )
-        
-        # Update user state
-        await db_client.update_user_state(
-            message.user_id,
-            current_state,
-            context
-        )
-        
+
         return {"response": response}
     except Exception as e:
         logger.error(f"Error in chat endpoint: {str(e)}")
