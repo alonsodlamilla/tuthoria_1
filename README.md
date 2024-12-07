@@ -1,19 +1,37 @@
-# Chatbot de WhatsApp con IA
+# TuthorIA - Asistente Educativo con WhatsApp
 
-Este proyecto implementa un chatbot para WhatsApp utilizando la API de WhatsApp Business, Flask para el backend, y la IA de OpenAI para el procesamiento de lenguaje natural.
+Este proyecto implementa un asistente educativo a través de WhatsApp utilizando la API de WhatsApp Business y modelos avanzados de IA para generar sesiones de aprendizaje personalizadas.
 
-## Arquitectura del Proyecto
+## Arquitectura del Sistema
 
-El sistema está compuesto por tres servicios principales:
+El sistema está compuesto por tres microservicios:
 
-- **WhatsApp Service**: Maneja las peticiones HTTP de WhatsApp y sirve como punto de entrada para los mensajes.
-- **OpenAI Service**: Procesa los mensajes usando GPT-4 y mantiene el historial de conversaciones.
-- **PostgreSQL**: Almacena datos de conversaciones y configuraciones.
+1. WhatsApp Service (Puerto 8501)
+   - Gestiona la integración con la API de WhatsApp
+   - Enruta los mensajes al Servicio de OpenAI
+   - Envía respuestas a los usuarios
 
+2. OpenAI Service (Puerto 8502)
+   - Procesa los mensajes usando LangChain
+   - Mantiene el contexto de la conversación
+   - Genera respuestas con IA
 
-Los servicios están containerizados usando Docker y se comunican entre sí de manera segura.
+3. DB Service (Puerto 8000)
+   - Almacena el historial de conversaciones
+   - Gestiona la persistencia de mensajes
+   - Proporciona recuperación de conversaciones
 
-![Arquitectura WhatsApp AI Chatbot](docs/architecture.png)
+### Flujo de Mensajes
+```mermaid
+sequenceDiagram
+    WhatsApp Service->>DB Service: Almacena mensaje entrante
+    WhatsApp Service->>OpenAI Service: Procesa mensaje
+    OpenAI Service->>DB Service: Obtiene historial
+    OpenAI Service->>OpenAI Service: Procesa con IA
+    OpenAI Service->>DB Service: Almacena respuesta
+    OpenAI Service->>WhatsApp Service: Retorna respuesta
+    WhatsApp Service->>Usuario: Envía mensaje
+```
 
 ### Estructura del Proyecto
 
@@ -21,64 +39,63 @@ Los servicios están containerizados usando Docker y se comunican entre sí de m
 .
 ├── compose.override.yml     # Configuración de desarrollo
 ├── compose.yml             # Configuración principal de Docker
-├── config/                 # Configuraciones del proyecto
-├── db/                     # Scripts de base de datos
-│   └── init.sql           # Inicialización de PostgreSQL
-├── ngrok-v3-stable-windows-amd64/  # Cliente ngrok para desarrollo local
-│   └── ngrok.exe
 ├── openai-service/         # Servicio de OpenAI
-│   ├── app.py             # Aplicación principal Flask
+│   ├── app.py             # Aplicación principal
 │   ├── Dockerfile         # Configuración de contenedor
-│   ├── langchainService.py # Servicios de LangChain
-│   ├── requirements.txt    # Dependencias completas
-│   └── shared/            # Código compartido del servicio
-│       └── templates/     # Plantillas de prompts
-├── shared/                # Código compartido global
-│   └── templates/        # Plantillas compartidas
-│       └── prompts.py    # Definición de prompts
-├── utils/                # Utilidades generales
-└── whatsapp-service/     # Servicio de WhatsApp
-    ├── app.py           # Aplicación principal Flask
+│   └── services/          # Servicios del módulo
+├── whatsapp-service/      # Servicio de WhatsApp
+│   ├── app.py            # Aplicación principal
+│   ├── Dockerfile        # Configuración de contenedor
+│   └── handlers/         # Manejadores de eventos
+└── db-service/           # Servicio de Base de Datos
+    ├── app.py           # Aplicación principal
     ├── Dockerfile       # Configuración de contenedor
-    └── handlers/        # Manejadores de eventos
-        └── prompt_handler.py # Procesamiento de prompts
+    └── routes/          # Rutas de la API
 ```
 
-### Requisitos Previos
+## Requisitos Previos
 
 Para ejecutar este proyecto necesitas:
 
-- Una cuenta de desarrollador de Facebook con acceso a la API de WhatsApp Business.
-- Acceso a la API de OpenAI.
+- Docker y Docker Compose
+- Cuenta de WhatsApp Business API
+- Acceso a la API de OpenAI
+- Cuenta de MongoDB Atlas
 
-### Configuración del Entorno
+## Configuración del Entorno
 
-El proyecto utiliza archivos .env separados para cada servicio:
+Cada servicio requiere su propio archivo .env:
 
 1. WhatsApp Service (.env):
-   - PORT
-   - WHATSAPP_VERIFY_TOKEN
-   - WHATSAPP_ACCESS_TOKEN
-   - WHATSAPP_API_URL
-   - WHATSAPP_NUMBER_ID
-   - OPENAI_SERVICE_URL
+```env
+WHATSAPP_VERIFY_TOKEN=token
+WHATSAPP_ACCESS_TOKEN=token
+WHATSAPP_API_URL=url
+OPENAI_SERVICE_URL=http://openai-service:8502
+DB_SERVICE_URL=http://db-service:8000/api/v1
+```
 
 2. OpenAI Service (.env):
-   - PORT
-   - OPENAI_API_KEY
-   - DB_HOST
-   - DB_NAME
-   - DB_USER
-   - DB_PASSWORD
+```env
+OPENAI_API_KEY=tu_api_key
+DB_SERVICE_URL=http://db-service:8000/api/v1
+```
 
-### Ejecución con Docker
+3. DB Service (.env):
+```env
+MONGODB_USER=usuario
+MONGODB_PASSWORD=contraseña
+MONGODB_HOST=tu.mongodb.host
+```
+
+## Ejecución con Docker
 
 1. Construir y ejecutar los servicios:
 ```bash
 docker-compose up --build
 ```
 
-2. Solo para desarrollo:
+2. Para desarrollo:
 ```bash
 docker compose -f compose.yml -f compose.override.yml up
 ```
@@ -88,34 +105,21 @@ docker compose -f compose.yml -f compose.override.yml up
 docker compose down
 ```
 
-#### Despliegue
+## Optimización de Construcción
 
-- Para desplegar este bot, puedes utilizar servicios como Heroku, AWS, o Google Cloud. Asegúrate de configurar las variables de entorno en tu plataforma de despliegue.
-- Una vez que el bot esté en funcionamiento, podrá interactuar con los usuarios a través de WhatsApp, responder preguntas y proporcionar información utilizando la inteligencia artificial de OpenAI.
+El servicio de OpenAI utiliza una construcción Docker multi-etapa para minimizar el tamaño final de la imagen:
 
-### CONTRIBUIR
+- Construcción multi-etapa para separar dependencias
+- Caché de wheels para paquetes Python
+- Imagen base mínima (python:3.10-slim)
+- Separación de dependencias de desarrollo
 
-Si tienes ideas, preguntas o deseas discutir sobre las posibilidades de la IA y cómo trabajar juntos para construir soluciones basadas en IAG, no dudes en contactarme:
-
-- GitHub: [https://github.com/albertgilopez](https://github.com/albertgilopez)
-- LinkedIn: Albert Gil López: [https://www.linkedin.com/in/albertgilopez/](https://www.linkedin.com/in/albertgilopez/)
-- Inteligencia Artificial Generativa (IAG) en español: [https://www.codigollm.es/](https://www.codigollm.es/)
-
-## Build Optimization
-
-The OpenAI service uses a multi-stage Docker build to minimize the final image size. Build times are optimized through:
-
-- Multi-stage builds to separate build dependencies from runtime
-- Wheel caching for Python packages
-- Minimal base image (python:3.10-slim)
-- Separation of dev dependencies
-
-To build for development:
+Para construir en desarrollo:
 ```bash
 docker build -t openai-service:dev .
 ```
 
-For production with minimal image:
+Para producción con imagen mínima:
 ```bash
 docker build --target production -t openai-service:prod .
 ```

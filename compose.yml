@@ -2,35 +2,32 @@ version: '3.8'
 
 services:
   whatsapp-service:
-    build:
-      context: ./whatsapp-service
-      target: production
-    ports:
-      - "8501:8501"
-    env_file:
-      - ./whatsapp-service/.env
-    volumes:
-      - ./shared:/app/shared:ro
+    build: ./whatsapp-service
+    environment:
+      - DB_SERVICE_URL=http://db-service:8000/api/v1
+      - OPENAI_SERVICE_URL=http://openai-service:8502
     depends_on:
-      - openai-service
       - db-service
+      - openai-service
 
   openai-service:
-    build:
-      context: ./openai-service
-      target: production
-    ports:
-      - "8502:8502"
-    env_file:
-      - ./openai-service/.env
-    volumes:
-      - ./shared:/app/shared:ro
+    build: ./openai-service
+    environment:
+      - DB_SERVICE_URL=http://db-service:8000/api/v1
     depends_on:
       - db-service
 
   db-service:
     build: ./db-service
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./db-service/.env
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:latest
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
