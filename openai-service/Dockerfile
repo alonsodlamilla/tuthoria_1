@@ -10,14 +10,14 @@ RUN apt-get update && \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Only installs production requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Development stage
 FROM builder as development
 
-# Install development dependencies
+# Installs additional development requirements
 COPY requirements-dev.txt .
 RUN pip install --no-cache-dir -r requirements-dev.txt
 
@@ -41,7 +41,7 @@ RUN apt-get update && \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only necessary files from builder
+# Copies only the installed packages from builder
 COPY --from=builder /usr/local/lib/python3.10/site-packages/ /usr/local/lib/python3.10/site-packages/
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
