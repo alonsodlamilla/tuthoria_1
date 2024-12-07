@@ -1,82 +1,29 @@
-import logging
 from fastapi import FastAPI, HTTPException, Depends
-from pydantic import BaseModel
-from typing import Optional, Dict
-import os
-from datetime import datetime
+from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 
-from services.db_client import DBClient
-from services.chat_service import ChatService
 from shared.templates.prompts import TEMPLATES
+from services.db_client import DBClient
+from config.settings import get_settings, Settings
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = FastAPI()
+settings = get_settings()
 
-app = FastAPI(
-    title="OpenAI Service", description="AI Chat Service with state management"
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+# Initialize clients
 db_client = DBClient()
-chat_service = ChatService()
-
-
-class Message(BaseModel):
-    content: str
-    user_id: str
-    context: Optional[Dict[str, str]] = None
-
-
-@app.post("/chat")
-async def chat_endpoint(message: Message):
-    """
-    Flow:
-    1. Receive message from WhatsApp Service
-    2. Get conversation history from DB
-    3. Process with AI
-    4. Store response in DB
-    5. Return response to WhatsApp Service
-    """
-    try:
-        # Get conversation history from DB service
-        history = await db_client.get_conversation_history(message.user_id)
-        
-        # Process message with ChatService
-        response = await chat_service.process_message(
-            message.content,
-            message.user_id,
-            history
-        )
-        
-        # Log conversation in DB
-        await db_client.log_conversation(
-            message.user_id,
-            message.content,
-            response
-        )
-        
-        return {"response": response}
-    except Exception as e:
-        logger.error(f"Error in chat endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/conversations/{user_id}")
-async def get_conversations(user_id: str, limit: int = 10):
-    try:
-        conversations = await db_client.get_conversation_history(user_id, limit)
-        return {"conversations": conversations}
-    except Exception as e:
-        logger.error(f"Error getting conversations: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    """Health check endpoint"""
+    return {"status": "healthy", "environment": settings.ENVIRONMENT}
 
-
-if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.environ.get("PORT", 8502))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+# Add your routes here
