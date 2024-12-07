@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import List
 from loguru import logger
 
@@ -23,8 +23,8 @@ async def add_message(
             conversation = {
                 "user_id": message.user_id,
                 "messages": [],
-                "created_at": datetime.now(UTC),
-                "updated_at": datetime.now(UTC)
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
             }
             await db.conversations.insert_one(conversation)
         
@@ -32,14 +32,14 @@ async def add_message(
         new_message = Message(
             content=message.content,
             sender=message.sender,
-            timestamp=datetime.now(UTC)
+            timestamp=datetime.now(timezone.utc)
         )
         
         await db.conversations.update_one(
             {"user_id": message.user_id},
             {
                 "$push": {"messages": new_message.model_dump()},
-                "$set": {"updated_at": datetime.now(UTC)}
+                "$set": {"updated_at": datetime.now(timezone.utc)}
             }
         )
         
