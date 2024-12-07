@@ -5,4 +5,7 @@ pymongo==4.5.0
 pydantic==2.5.2
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
-loguru==0.7.2 
+loguru==0.7.2
+certifi>=2023.7.22
+pytest-asyncio>=0.21.1
+httpx>=0.25.2 

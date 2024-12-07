@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 *~
 .env
+.env.*
+!.env.example
 .vscode/
 .idea/
 .DS_Store
@@ -11,3 +13,5 @@ venv/
 *.db
 credentials/
 *.json
+logs/
+*.log

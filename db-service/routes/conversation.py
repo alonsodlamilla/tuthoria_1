@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List
 from pymongo.errors import PyMongoError
 from loguru import logger
 
-from ..database import get_database
-from ..models.conversation import Conversation, ConversationCreate, MessageCreate
+from database import get_database
+from models.conversation import Conversation, ConversationCreate, Message
 
 router = APIRouter()
 
@@ -17,10 +17,10 @@ async def create_conversation(
     conversation: ConversationCreate, db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
-        conv_dict = conversation.dict()
+        conv_dict = conversation.model_dump()
         conv_dict["messages"] = []
-        conv_dict["created_at"] = datetime.utcnow()
-        conv_dict["updated_at"] = datetime.utcnow()
+        conv_dict["created_at"] = datetime.now(UTC)
+        conv_dict["updated_at"] = datetime.now(UTC)
 
         result = await db.conversations.insert_one(conv_dict)
         created_conv = await db.conversations.find_one({"_id": result.inserted_id})

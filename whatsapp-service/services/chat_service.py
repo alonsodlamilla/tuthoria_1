@@ -11,7 +11,11 @@ logger = logging.getLogger(__name__)
 
 class ChatService:
     def __init__(self):
-        mongo_uri = f"mongodb://{os.getenv('MONGO_USER')}:{os.getenv('MONGO_PASSWORD')}@{os.getenv('MONGO_HOST')}:{os.getenv('MONGO_PORT')}/"
+        mongodb_user = os.getenv("MONGODB_USER")
+        mongodb_password = os.getenv("MONGODB_PASSWORD")
+        mongodb_host = os.getenv("MONGODB_HOST")
+        
+        mongo_uri = f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}?retryWrites=true&w=majority"
         self.mongo_client = MongoClient(mongo_uri)
         self.db = self.mongo_client.whatsapp_db
         self.conversations = self.db.conversations
@@ -25,7 +29,7 @@ class ChatService:
 
             response = requests.post(
                 f"{openai_service_url}/chat",
-                json={"message": message, "user_id": number},
+                json={"content": message, "user_id": number},
             )
 
             if response.status_code == 200:

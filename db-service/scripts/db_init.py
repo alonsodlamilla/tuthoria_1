@@ -2,8 +2,8 @@ import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 from loguru import logger
 import os
-import ssl
 from dotenv import load_dotenv
+import certifi
 
 async def init_db():
     """Initialize database and create necessary collections and indexes."""
@@ -14,28 +14,24 @@ async def init_db():
         # Get MongoDB credentials
         mongodb_user = os.getenv("MONGODB_USER")
         mongodb_password = os.getenv("MONGODB_PASSWORD")
-        mongodb_host = os.getenv("MONGODB_HOST")
+        mongodb_host = os.getenv("MONGODB_HOST", "tuthoria.qbiwj.mongodb.net")
         db_name = "chat_db"
         
         if not all([mongodb_user, mongodb_password, mongodb_host]):
             raise ValueError("Missing MongoDB credentials in environment variables")
         
-        # Construct MongoDB URI
-        mongo_uri = f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}/{db_name}?retryWrites=true&w=majority"
+        # Construct MongoDB URI with connection options
+        mongo_uri = (
+            f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}"
+            "/?retryWrites=true&w=majority"
+        )
         
-        # Create TLS/SSL configuration
-        tls_config = {
-            "tls": True,
-            "tlsAllowInvalidCertificates": True,
-            "tlsInsecure": True
-        }
-        
-        # Connect to MongoDB
+        # Connect to MongoDB with proper TLS config
         logger.info("Connecting to MongoDB...")
         client = AsyncIOMotorClient(
             mongo_uri,
-            serverSelectionTimeoutMS=5000,  # 5 second timeout
-            **tls_config
+            serverSelectionTimeoutMS=5000,
+            tlsCAFile=certifi.where()
         )
         
         # Test connection

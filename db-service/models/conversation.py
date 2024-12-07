@@ -1,6 +1,20 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
+from bson import ObjectId
+
+
+class PyObjectId(str):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        if not ObjectId.is_valid(v):
+            if not isinstance(v, ObjectId):
+                raise ValueError("Invalid ObjectId")
+        return str(v)
 
 
 class Message(BaseModel):
@@ -22,10 +36,15 @@ class ConversationCreate(BaseModel):
 
 
 class Conversation(ConversationCreate):
-    id: Optional[str] = Field(alias="_id")
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
     messages: List[Message] = []
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        json_encoders = {ObjectId: str}
+        populate_by_name = True
+        arbitrary_types_allowed = True
 
 
 class MessageCreate(BaseModel):

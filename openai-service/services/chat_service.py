@@ -1,14 +1,25 @@
 import os
-import openai
-from typing import Dict, Tuple
+from typing import Dict
 import logging
+from langchain_openai import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
+from langchain.chains import LLMChain
+from langchain.memory import ConversationBufferMemory
 
 logger = logging.getLogger(__name__)
 
 class ChatService:
     def __init__(self):
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = "gpt-4"
+        # Initialize LangChain chat model
+        self.llm = ChatOpenAI(
+            model="gpt-4",
+            temperature=0.7,
+            max_tokens=1000,
+            api_key=os.getenv("OPENAI_API_KEY")
+        )
+        
+        # Initialize conversation memory
+        self.memories = {}
 
     async def process_message(
         self,
@@ -16,26 +27,39 @@ class ChatService:
         current_state: str,
         context: Dict[str, str]
     ) -> str:
-        """Process a message using OpenAI's GPT-4"""
+        """Process a message using LangChain"""
         try:
+            # Get or create memory for this conversation
+            memory = self.memories.get(context.get('user_id'))
+            if not memory:
+                memory = ConversationBufferMemory(
+                    memory_key="chat_history",
+                    return_messages=True
+                )
+                self.memories[context.get('user_id')] = memory
+            
             # Create system message based on state and context
-            system_message = self._create_system_message(current_state, context)
+            system_template = self._create_system_message(current_state, context)
             
-            # Create the messages array for the chat
-            messages = [
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": message}
-            ]
+            # Create prompt template
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_template),
+                ("human", "{input}"),
+            ])
             
-            # Call OpenAI API
-            response = await openai.ChatCompletion.acreate(
-                model=self.model,
-                messages=messages,
-                temperature=0.7,
-                max_tokens=1000
+            # Create chain
+            chain = LLMChain(
+                llm=self.llm,
+                prompt=prompt,
+                memory=memory,
+                verbose=True
             )
             
-            return response.choices[0].message.content
+            # Run chain
+            response = await chain.arun(input=message)
+            
+            return response
+            
         except Exception as e:
             logger.error(f"Error in process_message: {str(e)}")
             raise
