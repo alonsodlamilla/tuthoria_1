@@ -23,6 +23,10 @@ class DatabaseSettings(BaseSettings):
     MONGO_DB_NAME: str = "openai_service"
     MONGO_ATLAS_CLUSTER: Optional[str] = None
 
+    # DB Service settings
+    DB_SERVICE_HOST: str = "localhost"
+    DB_SERVICE_PORT: int = 8000
+
     @property
     def mongodb_uri(self) -> str:
         """Get MongoDB URI based on environment"""
@@ -33,7 +37,8 @@ class DatabaseSettings(BaseSettings):
             return f"mongodb+srv://{self.MONGO_USER}:{self.MONGO_PASSWORD}@{self.MONGO_ATLAS_CLUSTER}"
 
     class Config:
-        env_file = ".env"
+        env_file = f".env.{os.getenv('ENVIRONMENT', 'development').lower()}"
+        case_sensitive = True
 
 
 @lru_cache()

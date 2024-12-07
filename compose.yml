@@ -1,67 +1,43 @@
-version: '3'
+version: '3.8'
+
 services:
   whatsapp-service:
-    build:
-      context: ./whatsapp-service
-      cache_from:
-        - whatsapp-service:latest
-    env_file:
-      - ./whatsapp-service/.env
+    build: ./whatsapp-service
     ports:
       - "8501:8501"
+    env_file:
+      - ./whatsapp-service/.env
     depends_on:
-      openai-service:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-    volumes:
-      - ./utils:/app/utils:ro
-      - ./shared:/app/shared:ro
-    environment:
-      - PORT=8501
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - openai-service
+      - db-service
 
   openai-service:
-    build:
-      context: ./openai-service
-      cache_from:
-        - openai-service:latest
-    env_file:
-      - ./openai-service/.env
+    build: ./openai-service
     ports:
       - "8502:8502"
+    env_file:
+      - ./openai-service/.env
     depends_on:
-      mongodb:
-        condition: service_healthy
-    volumes:
-      - ./utils:/app/utils:ro
-      - ./shared:/app/shared:ro
-    environment:
-      - PORT=8502
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8502/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - db-service
+
+  db-service:
+    build: ./db-service
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./db-service/.env
+    depends_on:
+      - mongodb
 
   mongodb:
     image: mongo:latest
     ports:
       - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     volumes:
       - mongodb_data:/data/db
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=secret123
-    healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
-      interval: 10s
-      timeout: 10s
-      retries: 5
 
 volumes:
   mongodb_data:
