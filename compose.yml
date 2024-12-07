@@ -4,6 +4,8 @@ services:
   whatsapp-service:
     build: ./whatsapp-service
     env_file: ./whatsapp-service/.env
+    ports:
+      - "8501:8501"
     depends_on:
       - db-service
       - openai-service
@@ -11,12 +13,16 @@ services:
   openai-service:
     build: ./openai-service
     env_file: ./openai-service/.env
+    ports:
+      - "8502:8502"
     depends_on:
       - db-service
 
   db-service:
     build: ./db-service
     env_file: ./db-service/.env
+    ports:
+      - "8000:8000"
     depends_on:
       - mongodb
 

@@ -19,3 +19,13 @@ services:
       - DEBUG=1
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
+
+  db-service:
+    build:
+      target: development
+    volumes:
+      - ./db-service:/app:cached
+    environment:
+      - DEBUG=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
