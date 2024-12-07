@@ -24,6 +24,18 @@ services:
     image: mongo:latest
     volumes:
       - mongodb_data:/data/db
+    command: [ "mongod", "--quiet", "--logpath", "/dev/null" ]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   mongodb_data:

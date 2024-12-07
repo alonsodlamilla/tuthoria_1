@@ -1,16 +1,35 @@
-from fastapi import APIRouter, Depends, HTTPException
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from fastapi import APIRouter, status
+from fastapi.responses import JSONResponse
+from typing import Dict
 from database import get_database
 
 router = APIRouter()
 
-@router.get("/health")
-async def health_check(db: AsyncIOMotorDatabase = Depends(get_database)):
+@router.get("/health", 
+    response_model=Dict[str, str],
+    summary="Health Check",
+    description="Check the health status of the DB service and MongoDB connection")
+async def health_check():
     try:
-        await db.command("ping")
-        return {"status": "healthy", "database": "connected"}
+        # Test MongoDB connection
+        db = await get_database()
+        await db.command('ping')
+        
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "status": "healthy",
+                "database": "connected",
+                "service": "running"
+            }
+        )
     except Exception as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Database connection failed: {str(e)}"
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "unhealthy",
+                "database": "disconnected",
+                "service": "running",
+                "error": str(e)
+            }
         ) 

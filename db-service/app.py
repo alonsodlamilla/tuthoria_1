@@ -1,9 +1,13 @@
+import logging
 from fastapi import FastAPI
-from loguru import logger
 from contextlib import asynccontextmanager
-
+from logging_config import setup_logging
 from database import connect_to_database, close_database_connection
-from routes import conversation
+from routes import health, conversation
+
+# Setup logging
+setup_logging()
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -15,8 +19,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="DB Service",
-    description="Database service for chat application",
+    description="Database service for TuthorIA",
+    version="1.0.0",
     lifespan=lifespan
 )
 
-app.include_router(conversation.router, prefix="/api/v1", tags=["conversations"])
+# Include routers
+app.include_router(health.router, tags=["Health"])
+app.include_router(conversation.router, prefix="/api/v1", tags=["conversations"]) 
