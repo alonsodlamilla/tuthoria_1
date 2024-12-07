@@ -2,6 +2,7 @@ import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 from loguru import logger
 import os
+import ssl
 from dotenv import load_dotenv
 
 async def init_db():
@@ -20,11 +21,21 @@ async def init_db():
             raise ValueError("Missing MongoDB credentials in environment variables")
         
         # Construct MongoDB URI
-        mongo_uri = f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}/{db_name}?retryWrites=true&w=majority"
+        mongo_uri = f"mongodb+srv://{mongodb_user}:{mongodb_password}@{mongodb_host}/{db_name}?retryWrites=true&w=majority&tls=true&tlsAllowInvalidCertificates=true"
+        
+        # Create SSL context
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
         
         # Connect to MongoDB
         logger.info("Connecting to MongoDB...")
-        client = AsyncIOMotorClient(mongo_uri)
+        client = AsyncIOMotorClient(
+            mongo_uri,
+            serverSelectionTimeoutMS=5000,  # 5 second timeout
+            ssl_cert_reqs=ssl.CERT_NONE,
+            ssl=True
+        )
         
         # Test connection
         await client.admin.command('ping')
