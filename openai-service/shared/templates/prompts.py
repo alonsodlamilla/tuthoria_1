@@ -39,7 +39,10 @@ Cuando tengas toda la información, SIEMPRE tienes que decir:
 '¡Listo! Estoy generando la sesión de aprendizaje.<SECRET_KEY>'
 La palabra <SECRET_KEY> es un código secreto que generará la sesión de aprendizaje. No menciones nada sobre el código secreto.
 El cliente no verá este mensaje, así que no te preocupes por eso.
-
 """
 
-__all__ = ["SYSTEM_PROMPT"] 
+TEMPLATES = {
+    "system": SYSTEM_PROMPT
+}
+
+__all__ = ["SYSTEM_PROMPT", "TEMPLATES"] 
