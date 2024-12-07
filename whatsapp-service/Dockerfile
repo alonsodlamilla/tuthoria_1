@@ -1,4 +1,4 @@
-FROM python:3.10-slim as production
+FROM python:3.10-slim as builder
 
 WORKDIR /app
 
@@ -12,11 +12,14 @@ RUN apt-get update && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+FROM builder as development
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
 COPY . .
-
-# Add the project root to PYTHONPATH
 ENV PYTHONPATH=/app
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8501", "--reload"]
 
-# Use production server
+FROM builder as production
+COPY . .
+ENV PYTHONPATH=/app
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8501"]
