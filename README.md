@@ -22,7 +22,6 @@ Los servicios están containerizados usando Docker y se comunican entre sí de m
 ├── compose.override.yml     # Configuración de desarrollo
 ├── compose.yml             # Configuración principal de Docker
 ├── config/                 # Configuraciones del proyecto
-│   └── sheets_config.py    # Configuración de Google Sheets
 ├── db/                     # Scripts de base de datos
 │   └── init.sql           # Inicialización de PostgreSQL
 ├── ngrok-v3-stable-windows-amd64/  # Cliente ngrok para desarrollo local
@@ -38,7 +37,6 @@ Los servicios están containerizados usando Docker y se comunican entre sí de m
 │   └── templates/        # Plantillas compartidas
 │       └── prompts.py    # Definición de prompts
 ├── utils/                # Utilidades generales
-│   └── sheets_manager.py # Gestor de Google Sheets
 └── whatsapp-service/     # Servicio de WhatsApp
     ├── app.py           # Aplicación principal Flask
     ├── Dockerfile       # Configuración de contenedor
