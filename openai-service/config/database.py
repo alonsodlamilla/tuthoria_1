@@ -16,8 +16,7 @@ class DatabaseSettings(BaseSettings):
     ENVIRONMENT: Environment = Environment.DEVELOPMENT
 
     # DB Service settings
-    DB_SERVICE_HOST: str = "localhost"
-    DB_SERVICE_PORT: int = 8000
+    DB_SERVICE_URL: str = "http://db-service:8000/api/v1"
 
     class Config:
         env_file = f".env.{os.getenv('ENVIRONMENT', 'development').lower()}"
