@@ -3,24 +3,20 @@ version: '3.8'
 services:
   whatsapp-service:
     build: ./whatsapp-service
-    environment:
-      - DB_SERVICE_URL=http://db-service:8000/api/v1
-      - OPENAI_SERVICE_URL=http://openai-service:8502
+    env_file: ./whatsapp-service/.env
     depends_on:
       - db-service
       - openai-service
 
   openai-service:
     build: ./openai-service
-    environment:
-      - DB_SERVICE_URL=http://db-service:8000/api/v1
+    env_file: ./openai-service/.env
     depends_on:
       - db-service
 
   db-service:
     build: ./db-service
-    environment:
-      - MONGODB_URL=mongodb://mongodb:27017
+    env_file: ./db-service/.env
     depends_on:
       - mongodb
 
