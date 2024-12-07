@@ -1,99 +1,88 @@
 from fastapi import APIRouter, HTTPException, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
 from datetime import datetime, UTC
 from typing import List
-from pymongo.errors import PyMongoError
 from loguru import logger
 
 from database import get_database
-from models.conversation import Conversation, ConversationCreate, Message
+from models.conversation import Conversation, ConversationMessage, Message
 
 router = APIRouter()
 
-
-@router.post("/conversations/", response_model=Conversation)
-async def create_conversation(
-    conversation: ConversationCreate, db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    try:
-        conv_dict = conversation.model_dump()
-        conv_dict["messages"] = []
-        conv_dict["created_at"] = datetime.now(UTC)
-        conv_dict["updated_at"] = datetime.now(UTC)
-
-        result = await db.conversations.insert_one(conv_dict)
-        created_conv = await db.conversations.find_one({"_id": result.inserted_id})
-        logger.info(f"Created new conversation with ID: {result.inserted_id}")
-        return created_conv
-    except Exception as e:
-        logger.error(f"Failed to create conversation: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create conversation")
-
-
-@router.get("/conversations/", response_model=List[Conversation])
-async def get_conversations(
-    skip: int = 0, limit: int = 20, db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    conversations = await db.conversations.find().skip(skip).limit(limit).to_list(limit)
-    return conversations
-
-
-@router.get("/conversations/{conversation_id}", response_model=Conversation)
-async def get_conversation(
-    conversation_id: str, db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    if not ObjectId.is_valid(conversation_id):
-        raise HTTPException(status_code=400, detail="Invalid conversation ID")
-
-    conversation = await db.conversations.find_one({"_id": ObjectId(conversation_id)})
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return conversation
-
-
-@router.post("/conversations/{conversation_id}/messages")
+@router.post("/conversations/messages")
 async def add_message(
-    conversation_id: str,
-    message: MessageCreate,
-    db: AsyncIOMotorDatabase = Depends(get_database),
+    message: ConversationMessage,
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(conversation_id):
-        logger.warning(f"Invalid conversation ID format: {conversation_id}")
-        raise HTTPException(status_code=400, detail="Invalid conversation ID")
-
-    message_dict = message.dict()
-    message_dict["timestamp"] = datetime.utcnow()
-
+    """Store a new message in a conversation"""
     try:
-        result = await db.conversations.update_one(
-            {"_id": ObjectId(conversation_id)},
-            {
-                "$push": {"messages": message_dict},
-                "$set": {"updated_at": datetime.utcnow()},
-            },
+        # Find or create conversation for this user
+        conversation = await db.conversations.find_one({"user_id": message.user_id})
+        
+        if not conversation:
+            conversation = {
+                "user_id": message.user_id,
+                "messages": [],
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC)
+            }
+            await db.conversations.insert_one(conversation)
+        
+        # Add new message
+        new_message = Message(
+            content=message.content,
+            sender=message.sender,
+            timestamp=datetime.now(UTC)
         )
-    except PyMongoError as e:
-        logger.error(f"Database error while adding message: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        
+        await db.conversations.update_one(
+            {"user_id": message.user_id},
+            {
+                "$push": {"messages": new_message.model_dump()},
+                "$set": {"updated_at": datetime.now(UTC)}
+            }
+        )
+        
+        return {"status": "success", "message": "Message added successfully"}
+    except Exception as e:
+        logger.error(f"Error adding message: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add message")
 
-    if result.modified_count == 0:
-        logger.warning(f"Conversation not found: {conversation_id}")
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    logger.info(f"Added message to conversation {conversation_id}")
-    return {"status": "success", "message": "Message added successfully"}
-
-
-@router.delete("/conversations/{conversation_id}")
-async def delete_conversation(
-    conversation_id: str, db: AsyncIOMotorDatabase = Depends(get_database)
+@router.get("/conversations/{user_id}")
+async def get_conversation(
+    user_id: str,
+    limit: int = 10,
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(conversation_id):
-        raise HTTPException(status_code=400, detail="Invalid conversation ID")
+    """Get conversation history for a user"""
+    try:
+        conversation = await db.conversations.find_one({"user_id": user_id})
+        if not conversation:
+            return {"messages": []}
+            
+        # Get last N messages
+        messages = conversation.get("messages", [])[-limit:]
+        return {"messages": messages}
+    except Exception as e:
+        logger.error(f"Error getting conversation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get conversation")
 
-    result = await db.conversations.delete_one({"_id": ObjectId(conversation_id)})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    return {"status": "success", "message": "Conversation deleted successfully"}
+@router.get("/conversations/{user_id}/latest")
+async def get_latest_messages(
+    user_id: str,
+    limit: int = 5,
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Get latest messages for a user"""
+    try:
+        conversation = await db.conversations.find_one(
+            {"user_id": user_id},
+            {"messages": {"$slice": -limit}}
+        )
+        if not conversation:
+            return {"messages": []}
+            
+        return {"messages": conversation.get("messages", [])}
+    except Exception as e:
+        logger.error(f"Error getting latest messages: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get latest messages")

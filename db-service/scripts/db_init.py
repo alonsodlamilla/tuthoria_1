@@ -52,9 +52,12 @@ async def init_db():
             await db.create_collection('conversations')
             
             # Create indexes
-            logger.info("Creating indexes for conversations collection...")
             await db.conversations.create_index([("user_id", 1)])
-            await db.conversations.create_index([("created_at", -1)])
+            await db.conversations.create_index([("updated_at", -1)])
+            await db.conversations.create_index([
+                ("user_id", 1),
+                ("updated_at", -1)
+            ])
             
         if 'user_states' not in collections:
             logger.info("Creating user_states collection...")

@@ -19,6 +19,13 @@ class PyObjectId(str):
 
 class Message(BaseModel):
     content: str
+    sender: str  # user_id or "assistant"
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ConversationMessage(BaseModel):
+    user_id: str
+    content: str
     sender: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
@@ -37,6 +44,7 @@ class ConversationCreate(BaseModel):
 
 class Conversation(ConversationCreate):
     id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    user_id: str
     messages: List[Message] = []
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
