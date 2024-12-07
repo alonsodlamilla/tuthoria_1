@@ -18,8 +18,8 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down DB Service")
 
 app = FastAPI(
-    title="DB Service",
-    description="Database service for TuthorIA",
+    title="TuthorIA Database Service",
+    description="Database service for TuthorIA educational assistant",
     version="1.0.0",
     lifespan=lifespan
 )

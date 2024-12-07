@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 # Cargar variables de entorno
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(
+    title="TuthorIA WhatsApp Service",
+    description="WhatsApp integration service for TuthorIA educational assistant",
+    version="0.1.0"
+)
 chat_service = ChatService()
 webhook_handler = WebhookHandler()
 
