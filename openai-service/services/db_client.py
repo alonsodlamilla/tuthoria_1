@@ -22,40 +22,27 @@ class DBClient:
             self.session = None
 
     async def log_conversation(self, user_id: str, message: str, response: str) -> None:
-        """Log conversation via DB service"""
+        """Log conversation to DB service"""
         try:
             await self._ensure_session()
+            
+            # Log the message and response
             conversation_data = {
-                "content": message,
-                "sender": user_id
+                "user_id": user_id,
+                "messages": [
+                    {"content": message, "sender": user_id},
+                    {"content": response, "sender": "assistant"}
+                ]
             }
-            # First, ensure conversation exists
+            
             async with self.session.post(
                 f"{self.base_url}/conversations/",
-                json={"title": f"Chat with {user_id}", "participants": [user_id]}
-            ) as response:
-                if response.status not in [200, 409]:  # 409 means conversation already exists
-                    response.raise_for_status()
-                
-            # Add the message
-            async with self.session.post(
-                f"{self.base_url}/conversations/{user_id}/messages",
                 json=conversation_data
             ) as response:
                 response.raise_for_status()
-
-            # Add the response
-            response_data = {
-                "content": response,
-                "sender": "assistant"
-            }
-            async with self.session.post(
-                f"{self.base_url}/conversations/{user_id}/messages",
-                json=response_data
-            ) as response:
-                response.raise_for_status()
+                
         except Exception as e:
-            logger.error(f"Error in log_conversation: {str(e)}")
+            logger.error(f"Error logging conversation: {str(e)}")
             raise
 
     async def get_conversation_history(self, user_id: str, limit: int = 10) -> List[Dict]:
@@ -70,14 +57,7 @@ class DBClient:
                     return []
                 response.raise_for_status()
                 data = await response.json()
-                return [
-                    {
-                        "message": msg["content"] if msg["sender"] == user_id else None,
-                        "response": msg["content"] if msg["sender"] == "assistant" else None,
-                        "created_at": msg["timestamp"]
-                    }
-                    for msg in data.get("messages", [])[-limit:]
-                ]
+                return data.get("messages", [])
         except Exception as e:
-            logger.error(f"Error in get_conversation_history: {str(e)}")
+            logger.error(f"Error getting conversation history: {str(e)}")
             raise 

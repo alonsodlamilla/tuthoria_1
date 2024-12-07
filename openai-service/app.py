@@ -28,24 +28,32 @@ class Message(BaseModel):
 
 @app.post("/chat")
 async def chat_endpoint(message: Message):
+    """
+    Flow:
+    1. Receive message from WhatsApp Service
+    2. Get conversation history from DB
+    3. Process with AI
+    4. Store response in DB
+    5. Return response to WhatsApp Service
+    """
     try:
-        # Get context
-        context = await db_client.get_context(message.user_id)
-        
+        # Get conversation history from DB service
+        history = await db_client.get_conversation_history(message.user_id)
         
         # Process message with ChatService
         response = await chat_service.process_message(
             message.content,
-            context
+            message.user_id,
+            history
         )
         
-        # Log conversation
+        # Log conversation in DB
         await db_client.log_conversation(
             message.user_id,
             message.content,
             response
         )
-
+        
         return {"response": response}
     except Exception as e:
         logger.error(f"Error in chat endpoint: {str(e)}")
