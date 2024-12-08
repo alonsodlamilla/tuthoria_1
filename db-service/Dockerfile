@@ -29,6 +29,7 @@ CMD python scripts/db_init.py && uvicorn app:app --host 0.0.0.0 --port 8000 --re
 FROM builder as production
 COPY . .
 ENV PYTHONPATH=/app
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-8000} --workers 2 --worker-class uvicorn.workers.UvicornWorker --timeout 120 --log-level info --access-logfile - --error-logfile -"]
 
 # Add health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

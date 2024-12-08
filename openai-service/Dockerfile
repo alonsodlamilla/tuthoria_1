@@ -52,4 +52,4 @@ COPY . .
 ENV PYTHONPATH=/app
 
 # Use production server
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8502"]
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-8502} --workers 2 --worker-class uvicorn.workers.UvicornWorker --timeout 120 --log-level info --access-logfile - --error-logfile -"]
