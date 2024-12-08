@@ -1,1 +1,1 @@
-web: gunicorn "whatsapp_service.app:app" --bind 0.0.0.0:$PORT --timeout 120 --workers 4
+web: cd whatsapp-service && gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 4

@@ -17,9 +17,9 @@ COPY requirements-dev.txt .
 RUN pip install --no-cache-dir -r requirements-dev.txt
 COPY . .
 ENV PYTHONPATH=/app
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8501", "--reload"]
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8501} --reload"]
 
 FROM builder as production
 COPY . .
 ENV PYTHONPATH=/app
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8501"]
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8501}"]
