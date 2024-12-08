@@ -1,15 +1,16 @@
 # Core
-fastapi==0.109.0
-uvicorn==0.27.0
-python-dotenv==0.19.0
+fastapi>=0.68.0
+uvicorn>=0.15.0
+gunicorn>=20.1.0
+python-dotenv>=0.19.0
 
 # HTTP Clients
-requests==2.31.0
+requests>=2.26.0
 urllib3==1.26.6
 aiohttp==3.9.1
 
 # Validation
-pydantic==2.5.2
+pydantic>=1.8.2
 
 # Logging
 loguru==0.7.2
