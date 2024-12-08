@@ -150,11 +150,17 @@ async def webhook(request: Request):
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    logger.info("Health check called")
+    try:
+        return {"status": "healthy", "timestamp": time.time()}
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(status_code=503, detail="Service Unavailable")
 
 
 if __name__ == "__main__":
     import uvicorn
 
     port = int(os.getenv("PORT", 8501))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    logger.info(f"Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
