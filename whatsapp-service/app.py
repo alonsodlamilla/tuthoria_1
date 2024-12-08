@@ -18,7 +18,7 @@ load_dotenv()
 app = FastAPI(
     title="TuthorIA WhatsApp Service",
     description="WhatsApp integration service for TuthorIA educational assistant",
-    version="0.1.0"
+    version="0.1.0",
 )
 chat_service = ChatService()
 webhook_handler = WebhookHandler()
@@ -127,7 +127,7 @@ async def webhook(request: Request):
 
             # 2. Send to OpenAI service for processing
             response = await chat_service.send_message_to_openai(message_text, user_id)
-            
+
             # 3. Send WhatsApp response
             message_data = webhook_handler.create_message_body(user_id, response)
             webhook_handler.send_whatsapp_message(message_data)
@@ -138,7 +138,7 @@ async def webhook(request: Request):
             # Send error message to user
             error_data = webhook_handler.create_message_body(
                 user_id,
-                "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta nuevamente."
+                "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta nuevamente.",
             )
             webhook_handler.send_whatsapp_message(error_data)
             return "OK"
@@ -148,9 +148,9 @@ async def webhook(request: Request):
         raise HTTPException(status_code=500, detail="Internal error")
 
 
-@app.get("/test")
-async def test():
-    return "API funcionando!"
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
 
 
 if __name__ == "__main__":
