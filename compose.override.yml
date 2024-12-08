@@ -1,0 +1,31 @@
+version: '3'
+services:
+  whatsapp-service:
+    build:
+      target: development
+    volumes:
+      - ./whatsapp-service:/app:cached
+    environment:
+      - DEBUG=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+
+  openai-service:
+    build:
+      target: development
+    volumes:
+      - ./openai-service:/app:cached
+    environment:
+      - DEBUG=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+
+  db-service:
+    build:
+      target: development
+    volumes:
+      - ./db-service:/app:cached
+    environment:
+      - DEBUG=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1

@@ -1,7 +1,10 @@
 __pycache__/
+.pytest_cache/
 *.pyc
 *~
 .env
+.env.*
+!.env.example
 .vscode/
 .idea/
 .DS_Store
@@ -10,3 +13,6 @@ instance/
 venv/
 *.db
 credentials/
+*.json
+logs/
+*.log
