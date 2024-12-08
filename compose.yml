@@ -5,7 +5,7 @@ services:
     build: ./whatsapp-service
     env_file: ./whatsapp-service/.env
     ports:
-      - "8501:8501"
+      - "${PORT:-8501}:8501"
     depends_on:
       - db-service
       - openai-service
@@ -13,16 +13,16 @@ services:
   openai-service:
     build: ./openai-service
     env_file: ./openai-service/.env
-    ports:
-      - "8502:8502"
+    expose:
+      - "8502"
     depends_on:
       - db-service
 
   db-service:
     build: ./db-service
     env_file: ./db-service/.env
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     depends_on:
       - mongodb
 
@@ -31,16 +31,16 @@ services:
     volumes:
       - mongodb_data:/data/db
     command: [ "mongod", "--quiet", "--logpath", "/dev/null" ]
+    expose:
+      - "27017"
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    networks:
-      - app-network
 
 networks:
-  app-network:
+  default:
     driver: bridge
 
 volumes:
