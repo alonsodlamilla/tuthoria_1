@@ -1,7 +1,0 @@
-[build]
-builder = "nixpacks"
-buildCommand = "docker compose up --build"
-
-[deploy]
-startCommand = "docker compose up"
-restartPolicyType = "ON_FAILURE" 
