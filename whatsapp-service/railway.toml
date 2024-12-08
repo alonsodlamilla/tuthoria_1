@@ -5,5 +5,3 @@ target = "production"
 [deploy]
 startCommand = "pip install -r requirements.txt && python -m gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --worker-class uvicorn.workers.UvicornWorker --timeout 120"
 restartPolicyType = "ON_FAILURE"
-healthcheckPath = "/health"
-healthcheckTimeout = 180 
