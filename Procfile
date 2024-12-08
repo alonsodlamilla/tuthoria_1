@@ -1,1 +1,1 @@
-web: cd whatsapp-service && pip install -r requirements.txt && gunicorn app:app --bind 0.0.1.0:$PORT --workers 4 --timeout 120
+web: cd whatsapp-service && pip install -r requirements.txt && gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --timeout 120
