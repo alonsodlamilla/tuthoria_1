@@ -5,6 +5,9 @@ import logging
 import time
 from pydantic import BaseModel
 from typing import Optional
+import httpx
+import asyncio
+from contextlib import asynccontextmanager
 
 from services.chat_service import ChatService
 from handlers.webhook_handler import WebhookHandler
@@ -16,10 +19,50 @@ logger = logging.getLogger(__name__)
 # Cargar variables de entorno
 load_dotenv()
 
+
+async def check_service_health(service_url: str, service_name: str) -> bool:
+    """Check if a service is healthy"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{service_url}/health")
+            if response.status_code == 200:
+                logger.info(f"{service_name} service is healthy")
+                return True
+            logger.error(f"{service_name} service health check failed: {response.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Error checking {service_name} health: {str(e)}")
+        return False
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown events"""
+    # Check services health on startup
+    services = [
+        (os.getenv("DB_SERVICE_URL"), "Database"),
+        (os.getenv("OPENAI_SERVICE_URL"), "OpenAI"),
+    ]
+
+    health_results = await asyncio.gather(
+        *[check_service_health(url, name) for url, name in services]
+    )
+
+    if not all(health_results):
+        logger.error("Not all required services are healthy")
+        # You can choose to raise an exception here if you want to prevent startup
+        # raise RuntimeError("Required services are not healthy")
+
+    logger.info("All services are healthy, starting WhatsApp service")
+    yield
+    logger.info("Shutting down WhatsApp service")
+
+
 app = FastAPI(
     title="TuthorIA WhatsApp Service",
     description="WhatsApp integration service for TuthorIA educational assistant",
     version="0.1.0",
+    lifespan=lifespan,
 )
 chat_service = ChatService()
 webhook_handler = WebhookHandler()
