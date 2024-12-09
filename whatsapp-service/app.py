@@ -178,7 +178,6 @@ async def webhook(request: Request):
                         continue
 
                     message_id = message["id"]
-                    webhook_handler.mark_message_processing(message_id)
 
                     try:
                         user_id = message["from"]
