@@ -13,11 +13,14 @@ class Settings(BaseSettings):
     )
     host: str = Field(default="0.0.0.0", alias="HOST")
     port: int = Field(default=8000, alias="PORT")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    mongodb_log_level: str = Field(default="WARN", alias="MONGODB_LOG_LEVEL")
 
     class Config:
         env_file = ".env"
         env_prefix = ""
         case_sensitive = False
+        extra = "allow"
 
     @property
     def mongodb_url(self) -> str:
