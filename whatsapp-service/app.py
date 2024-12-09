@@ -5,6 +5,8 @@ import logging
 import time
 from pydantic import BaseModel
 from typing import Optional
+
+from requests import request
 from services.chat_service import ChatService
 from handlers.webhook_handler import WebhookHandler
 
@@ -82,6 +84,11 @@ async def chat(request: ChatRequest):
 async def webhook_verify(
     hub_mode: str = None, hub_verify_token: str = None, hub_challenge: str = None
 ):
+    # Fix parameter names to match WhatsApp's query parameters
+    hub_mode = request.query_params.get("hub.mode")
+    hub_verify_token = request.query_params.get("hub.verify_token")
+    hub_challenge = request.query_params.get("hub.challenge")
+
     if hub_mode and hub_verify_token:
         if hub_mode == "subscribe" and hub_verify_token == os.getenv(
             "WHATSAPP_VERIFY_TOKEN"
