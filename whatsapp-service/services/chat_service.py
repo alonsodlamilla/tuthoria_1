@@ -39,7 +39,7 @@ class ChatService:
         """Store message in DB service"""
         try:
             response = requests.post(
-                f"{self.db_service_url}/conversations/messages",
+                f"{self.db_service_url}/api/v1/conversations/messages",
                 json={
                     "user_id": user_id,
                     "content": message,
