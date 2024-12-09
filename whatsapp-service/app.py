@@ -1,8 +1,7 @@
+import time
 from fastapi import FastAPI, Request, HTTPException
 import os
 from dotenv import load_dotenv
-import logging
-import time
 from pydantic import BaseModel
 from typing import Optional, List, Tuple
 import aiohttp
@@ -13,10 +12,6 @@ from loguru import logger
 
 from services.chat_service import ChatService
 from handlers.webhook_handler import WebhookHandler
-
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Cargar variables de entorno
 load_dotenv()
