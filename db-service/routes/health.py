@@ -5,23 +5,26 @@ from database import get_database
 
 router = APIRouter()
 
-@router.get("/health", 
+
+@router.get(
+    "/health",
     response_model=Dict[str, str],
     summary="Health Check",
-    description="Check the health status of the DB service and MongoDB connection")
+    description="Check the health status of the DB service and MongoDB connection",
+)
 async def health_check():
     try:
         # Test MongoDB connection
         db = await get_database()
-        await db.command('ping')
-        
+        await db.command("ping")
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
                 "status": "healthy",
                 "database": "connected",
-                "service": "running"
-            }
+                "service": "running",
+            },
         )
     except Exception as e:
         return JSONResponse(
@@ -30,6 +33,6 @@ async def health_check():
                 "status": "unhealthy",
                 "database": "disconnected",
                 "service": "running",
-                "error": str(e)
-            }
-        ) 
+                "error": str(e),
+            },
+        )

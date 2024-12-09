@@ -22,7 +22,6 @@ async def connect_to_database():
             logger.info(
                 f"Connecting to MongoDB (attempt {retry_count + 1}/{max_retries})..."
             )
-            logger.debug(f"Connection URL: {Database.settings.get_mongodb_url()}")
 
             Database.client = AsyncIOMotorClient(
                 Database.settings.get_mongodb_url(),
