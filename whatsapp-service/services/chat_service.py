@@ -3,6 +3,7 @@ from typing import Dict
 from config import get_settings
 import requests
 from loguru import logger
+from datetime import datetime
 
 
 class ChatService:
@@ -54,7 +55,8 @@ class ChatService:
                 "user_id": user_id,
                 "content": message,
                 "sender": user_id if is_user else "assistant",
-                "message_type": "text",  # Add consistent message type
+                "message_type": "text",
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
             logger.debug(f"Storing message with payload: {payload}")

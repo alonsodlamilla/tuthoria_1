@@ -2,6 +2,7 @@ import httpx
 from loguru import logger
 from typing import List, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential
+from datetime import datetime
 
 from config.settings import get_settings
 
@@ -57,6 +58,8 @@ class DBClient:
                 "user_id": user_id,
                 "content": content,
                 "sender": user_id if is_user else "assistant",
+                "message_type": "text",
+                "timestamp": datetime.utcnow().isoformat(),
             }
             logger.debug(f"Making POST request to: {url}")
             logger.debug(f"Request payload: {payload}")
