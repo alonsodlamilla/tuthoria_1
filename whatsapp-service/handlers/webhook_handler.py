@@ -1,7 +1,7 @@
-import os
 import logging
 from typing import Dict, Any
 import requests
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -9,11 +9,9 @@ logger = logging.getLogger(__name__)
 class WebhookHandler:
     def __init__(self):
         self.processed_messages = set()
-        self.token = os.getenv("WHATSAPP_ACCESS_TOKEN")
-        self.api_url = os.getenv("WHATSAPP_API_URL")
-
-        if not self.token or not self.api_url:
-            raise ValueError("Missing WhatsApp API configuration")
+        self.settings = get_settings()
+        self.token = self.settings.whatsapp_access_token
+        self.api_url = self.settings.get_whatsapp_api_url()
 
     def send_whatsapp_message(self, body: Dict[str, Any]) -> bool:
         """Send message to WhatsApp API"""
