@@ -1,121 +1,57 @@
+import os
 import time
 from fastapi import FastAPI, Request, HTTPException
-import os
-from dotenv import load_dotenv
-from pydantic import BaseModel
-from typing import Optional, List, Tuple
+import logging
 import aiohttp
 import asyncio
 from contextlib import asynccontextmanager
 import socket
-from loguru import logger
+from pydantic import BaseModel
+from typing import Optional
 
+from config import get_settings
+from logging_config import setup_logging
 from services.chat_service import ChatService
 from handlers.webhook_handler import WebhookHandler
 
-# Cargar variables de entorno
-load_dotenv()
+# Setup logging
+setup_logging()
+logger = logging.getLogger(__name__)
 
-# At the top after imports and before ServiceConfig class
-# Add environment validation
-required_env_vars = [
-    "PORT",
-    "DB_SERVICE_PORT",
-    "OPENAI_SERVICE_PORT",
-    "DB_SERVICE_DOMAIN",
-    "OPENAI_SERVICE_DOMAIN",
-    "DB_SERVICE_PROTOCOL",
-    "OPENAI_SERVICE_PROTOCOL",
-    "WHATSAPP_VERIFY_TOKEN",
-    "WHATSAPP_ACCESS_TOKEN",
-    "WHATSAPP_API_VERSION",
-    "WHATSAPP_NUMBER_ID",
-]
-
-missing_vars = [var for var in required_env_vars if not os.getenv(var)]
-if missing_vars:
-    raise ValueError(
-        f"Missing required environment variables: {', '.join(missing_vars)}"
-    )
-
-
-# URL builders
-def build_service_url(protocol: str, domain: str, port: int, path: str = "") -> str:
-    return f"{protocol}://{domain}:{port}{path}"
-
-
-def build_whatsapp_api_url() -> str:
-    version = os.getenv("WHATSAPP_API_VERSION")
-    number_id = os.getenv("WHATSAPP_NUMBER_ID")
-    return f"https://graph.facebook.com/{version}/{number_id}/messages"
-
-
-class ServiceConfig:
-    """Service configuration and health check settings"""
-
-    def __init__(self, name: str, display_name: str):
-        self.name = name
-        self.display_name = display_name
-
-        # Get environment variables for this service
-        self.protocol = os.getenv(f"{name.upper()}_PROTOCOL")
-        self.domain = os.getenv(f"{name.upper()}_DOMAIN")
-        self.port = int(os.getenv(f"{name.upper()}_PORT"))
-
-        # Build the health URL
-        self.health_url = build_service_url(
-            self.protocol, self.domain, self.port, "/health"
-        )
-
-
-SERVICES: List[ServiceConfig] = [
-    ServiceConfig("db-service", "Database"),
-    ServiceConfig("openai-service", "OpenAI"),
-]
-
-
-async def check_service_health(service: ServiceConfig) -> bool:
-    """Check if a service is healthy using IPv6"""
-    try:
-        connector = aiohttp.TCPConnector(
-            family=socket.AF_INET6,  # Force IPv6
-            ssl=None,  # Disable SSL completely for internal traffic
-        )
-
-        async with aiohttp.ClientSession(connector=connector) as session:
-            try:
-                async with session.get(service.health_url, timeout=5) as response:
-                    if response.status == 200:
-                        logger.info(
-                            f"{service.display_name} service is healthy at {service.health_url}"
-                        )
-                        return True
-                    logger.error(
-                        f"{service.display_name} service health check failed: {await response.text()}"
-                    )
-            except Exception as e:
-                logger.error(f"Failed to connect to {service.health_url}: {str(e)}")
-                return False
-
-        return False
-    except Exception as e:
-        logger.error(f"Error checking {service.display_name} health: {str(e)}")
-        return False
+# Get settings
+settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
+    logger.info("Starting WhatsApp service")
+
     # Check services health on startup
-    health_results = await asyncio.gather(
-        *[check_service_health(service) for service in SERVICES]
-    )
+    services = [("db", "/health"), ("openai", "/health")]
+
+    health_results = []
+    for service, path in services:
+        url = settings.build_service_url(service, path)
+        try:
+            connector = aiohttp.TCPConnector(
+                family=socket.AF_INET6,
+                ssl=None,
+            )
+            async with aiohttp.ClientSession(connector=connector) as session:
+                async with session.get(url, timeout=5) as response:
+                    is_healthy = response.status == 200
+                    health_results.append(is_healthy)
+                    logger.info(
+                        f"{service} service health check: {'healthy' if is_healthy else 'unhealthy'}"
+                    )
+        except Exception as e:
+            logger.error(f"Failed to connect to {service} service: {str(e)}")
+            health_results.append(False)
 
     if not all(health_results):
         logger.error("Not all required services are healthy")
-        # You might want to add specific handling for unhealthy services
 
-    logger.info("Starting WhatsApp service")
     yield
     logger.info("Shutting down WhatsApp service")
 
@@ -123,9 +59,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="TuthorIA WhatsApp Service",
     description="WhatsApp integration service for TuthorIA educational assistant",
-    version="0.1.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
+
 chat_service = ChatService()
 webhook_handler = WebhookHandler()
 
