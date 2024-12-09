@@ -16,18 +16,17 @@ class ChatService:
         try:
             logger.info("Sending to OpenAI - User: %s, Message: %s", user_id, message)
 
-            # Format the request payload as expected by OpenAI service
             payload = {
                 "content": message,
                 "user_id": user_id,
-                "message_type": "text",  # Add message type as expected by OpenAI service
+                "message_type": "text",
             }
 
             logger.debug(f"Request payload to OpenAI service: {payload}")
             response = requests.post(
                 f"{self.openai_service_url}/chat",
                 json=payload,
-                timeout=30.0,  # Add timeout
+                timeout=60.0,  # Increased timeout
             )
 
             if response.status_code == 200:
@@ -39,6 +38,9 @@ class ChatService:
                 logger.error(f"Status code: {response.status_code}")
                 return "Lo siento, hubo un error al procesar tu mensaje."
 
+        except requests.Timeout:
+            logger.error("Timeout while waiting for OpenAI response")
+            return "Lo siento, el servicio está tardando demasiado. Por favor, intenta nuevamente."
         except Exception as e:
             logger.error(f"Error in send_message_to_openai: {str(e)}", exc_info=True)
             return "Lo siento, hubo un error. ¿Podemos intentar nuevamente?"

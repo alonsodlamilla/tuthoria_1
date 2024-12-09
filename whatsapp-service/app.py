@@ -147,70 +147,65 @@ async def webhook_verify(request: Request):
 @app.post("/whatsapp")
 async def webhook(request: Request):
     try:
-        # Parse incoming webhook data
         data = await request.json()
-        logger.info("Webhook received data: %s", data)
 
         if not data or "entry" not in data:
-            logger.warning("Invalid webhook data received")
             return "OK"
 
-        # Process each entry
         for entry in data["entry"]:
             if "changes" not in entry:
                 continue
 
             for change in entry["changes"]:
-                if "value" not in change or "messages" not in change["value"]:
+                value = change.get("value", {})
+
+                # Skip status updates
+                if "statuses" in value:
                     continue
 
-                for message in change["value"]["messages"]:
-                    # Check if it's a status message
-                    if "type" not in message or message["type"] != "text":
+                if "messages" not in value:
+                    continue
+
+                for message in value["messages"]:
+                    # Only process text messages
+                    if message.get("type") != "text":
                         continue
 
                     message_id = message.get("id")
-
-                    # Skip if message was already processed
-                    if webhook_handler.is_message_processed(message_id):
-                        logger.info(f"Skipping already processed message: {message_id}")
+                    if not message_id:
                         continue
 
-                    # Mark message as processed before processing
+                    # Skip if already processed
+                    if webhook_handler.is_message_processed(message_id):
+                        continue
+
                     webhook_handler.mark_message_processed(message_id)
 
                     try:
                         user_id = message["from"]
                         message_text = message["text"]["body"]
 
-                        logger.info(
-                            "Processing new message - From: %s, Content: %s",
-                            user_id,
-                            message_text,
-                        )
-
-                        # Store incoming message
+                        # Store message first
                         await chat_service.store_message(
                             user_id, message_text, is_user=True
                         )
 
-                        # Get AI response
+                        # Get AI response with increased timeout
                         response = await chat_service.send_message_to_openai(
                             message_text, user_id
                         )
 
-                        # Send WhatsApp response
-                        message_data = webhook_handler.create_message_body(
-                            user_id, response
-                        )
-                        webhook_handler.send_whatsapp_message(message_data)
+                        if response:
+                            message_data = webhook_handler.create_message_body(
+                                user_id, response
+                            )
+                            webhook_handler.send_whatsapp_message(message_data)
 
                     except Exception as e:
                         logger.error(
                             f"Error processing message {message_id}: {str(e)}",
                             exc_info=True,
                         )
-                        # Send error message only for unhandled exceptions
                         error_data = webhook_handler.create_message_body(
                             user_id,
                             "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta nuevamente.",
