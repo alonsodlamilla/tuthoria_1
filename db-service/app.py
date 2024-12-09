@@ -9,6 +9,7 @@ from routes import health, conversation
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting DB Service")
@@ -17,13 +18,14 @@ async def lifespan(app: FastAPI):
     await close_database_connection()
     logger.info("Shutting down DB Service")
 
+
 app = FastAPI(
     title="TuthorIA Database Service",
     description="Database service for TuthorIA educational assistant",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Include routers
 app.include_router(health.router, tags=["Health"])
-app.include_router(conversation.router, prefix="/api/v1", tags=["conversations"]) 
+app.include_router(conversation.router, prefix="/api/v1", tags=["conversations"])
