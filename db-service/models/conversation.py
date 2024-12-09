@@ -32,22 +32,29 @@ class ConversationMessage(BaseModel):
     message_type: str = "text"
 
 
-class ConversationCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=100)
-    participants: List[str] = Field(..., min_items=1)
+class ConversationBase(BaseModel):
+    title: Optional[str] = None
+    participants: List[str] = Field(default_factory=list)
+    user_id: str
+
+    @field_validator("title")
+    @classmethod
+    def set_default_title(cls, v, values):
+        if v is None and "user_id" in values:
+            return f"Chat with {values['user_id']}"
+        return v
 
     @field_validator("participants")
     @classmethod
-    def validate_participants(cls, v):
-        if not all(isinstance(p, str) and p.strip() for p in v):
-            raise ValueError("All participants must be non-empty strings")
+    def set_default_participants(cls, v, values):
+        if not v and "user_id" in values:
+            return [values["user_id"]]
         return v
 
 
-class Conversation(ConversationCreate):
+class Conversation(ConversationBase):
     id: Optional[PyObjectId] = Field(default=None, alias="_id")
-    user_id: str
-    messages: List[Message] = []
+    messages: List[Message] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
