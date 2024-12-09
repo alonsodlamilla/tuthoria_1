@@ -45,6 +45,10 @@ class Settings(BaseSettings):
         else:
             raise ValueError(f"Unknown service: {service}")
 
+        # In production (Railway), we don't include the port in the URL
+        if self.environment == "production":
+            return f"{protocol}://{domain}{path}"
+
         return f"{protocol}://{domain}:{port}{path}"
 
 
