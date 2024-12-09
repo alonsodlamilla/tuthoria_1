@@ -104,6 +104,8 @@ async def webhook(request: Request):
     try:
         # Parse incoming webhook data
         data = await request.json()
+        logger.info("Webhook received data: %s", data)
+
         if not data:
             logger.error("No data received")
             return "OK"
@@ -128,12 +130,15 @@ async def webhook(request: Request):
         user_id = message["from"]
         message_text = message["text"]["body"]
 
+        logger.info("Message received - From: %s, Content: %s", user_id, message_text)
+
         try:
             # 1. Store incoming message in DB
             await chat_service.store_message(user_id, message_text, is_user=True)
 
             # 2. Send to OpenAI service for processing
             response = await chat_service.send_message_to_openai(message_text, user_id)
+            logger.info("AI Response for %s: %s", user_id, response)
 
             # 3. Send WhatsApp response
             message_data = webhook_handler.create_message_body(user_id, response)

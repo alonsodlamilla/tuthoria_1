@@ -11,13 +11,14 @@ class WebhookHandler:
         self.processed_messages = set()
         self.token = os.getenv("WHATSAPP_ACCESS_TOKEN")
         self.api_url = os.getenv("WHATSAPP_API_URL")
-        
+
         if not self.token or not self.api_url:
             raise ValueError("Missing WhatsApp API configuration")
 
     def send_whatsapp_message(self, body: Dict[str, Any]) -> bool:
         """Send message to WhatsApp API"""
         try:
+            logger.info("Sending WhatsApp message to: %s", body.get("to"))
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.token}",
@@ -25,7 +26,8 @@ class WebhookHandler:
 
             response = requests.post(self.api_url, headers=headers, json=body)
             response.raise_for_status()
-            
+
+            logger.info("WhatsApp message sent successfully to: %s", body.get("to"))
             return True
         except Exception as e:
             logger.error(f"Error sending WhatsApp message: {str(e)}")
