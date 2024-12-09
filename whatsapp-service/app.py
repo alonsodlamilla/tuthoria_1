@@ -30,7 +30,7 @@ class ServiceConfig:
         self.display_name = display_name
         self.port = port
         self.host = f"{name}.railway.internal"
-        self.health_url = f"http://[{self.host}]:{port}/health"
+        self.health_url = f"http://{self.host}:{port}/health"
 
 
 SERVICES: List[ServiceConfig] = [
