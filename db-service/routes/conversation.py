@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from models.conversation import ConversationMessage, Conversation
+from models.conversation import ConversationMessage, Conversation, Message
 from database import get_database
 from datetime import datetime
 from bson import ObjectId
@@ -23,24 +23,21 @@ async def add_message(message: ConversationMessage):
 
         if not conversation:
             logger.info(f"Creating new conversation for user: {message.user_id}")
+            # Create new conversation with default title and participants
             conversation = Conversation(
                 user_id=message.user_id,
-                messages=[],
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            )
-            conversation_id = await db.conversations.insert_one(
-                conversation.dict(by_alias=True)
-            )
-            conversation["_id"] = conversation_id.inserted_id
+            ).model_dump(by_alias=True)
 
-        # Add new message to conversation
-        new_message = {
-            "content": message.content,
-            "sender": message.sender,
-            "timestamp": message.timestamp,
-            "message_type": message.message_type,
-        }
+            result = await db.conversations.insert_one(conversation)
+            conversation["_id"] = result.inserted_id
+
+        # Create new message
+        new_message = Message(
+            content=message.content,
+            sender=message.sender,
+            timestamp=message.timestamp,
+            message_type=message.message_type,
+        ).model_dump()
 
         # Update conversation with new message
         try:
