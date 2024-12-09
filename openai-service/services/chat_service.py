@@ -49,13 +49,15 @@ class ChatService:
             chat_history = self._format_history(history)
             logger.debug(f"Formatted chat history length: {len(chat_history)}")
 
-            # Create chain input
-            chain_input = {"chat_history": chat_history, "input": message}
-            logger.debug(f"Prepared chain input: {chain_input}")
+            # Create messages for the prompt
+            messages = self.prompt.format_messages(
+                chat_history=chat_history, input=message
+            )
+            logger.debug(f"Formatted messages for LLM")
 
             # Run chain
             logger.info("Invoking LLM")
-            response = await self.llm.ainvoke(chain_input)
+            response = await self.llm.ainvoke(messages)
             logger.debug(f"Raw LLM response: {response}")
 
             logger.info(f"Successfully processed message for user {user_id}")
