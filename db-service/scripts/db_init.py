@@ -47,56 +47,13 @@ async def init_db():
         collections = await db.list_collection_names()
         collection_exists = "conversations" in collections
 
-        # Drop if force flag is set
-        if os.getenv("DROP_EXISTING", "false").lower() == "true" and collection_exists:
-            logger.warning("Dropping existing collection...")
-            await db.conversations.drop()
-            collection_exists = False
-
-        # Define schema
-        conversation_schema = {
-            "bsonType": "object",
-            "required": ["user_id", "messages", "created_at", "updated_at"],
-            "properties": {
-                "user_id": {"bsonType": "string"},
-                "messages": {
-                    "bsonType": "array",
-                    "items": {
-                        "bsonType": "object",
-                        "required": [
-                            "content",
-                            "sender",
-                            "timestamp",
-                            "message_type",
-                        ],
-                        "properties": {
-                            "content": {"bsonType": "string"},
-                            "sender": {"bsonType": "string"},
-                            "timestamp": {"bsonType": "date"},
-                            "message_type": {"bsonType": "string"},
-                        },
-                    },
-                },
-                "created_at": {"bsonType": "date"},
-                "updated_at": {"bsonType": "date"},
-            },
-        }
-
-        if collection_exists:
-            logger.info("Updating existing conversations collection schema...")
-            await db.command(
-                {
-                    "collMod": "conversations",
-                    "validator": {"$jsonSchema": conversation_schema},
-                    "validationLevel": "strict",
-                }
-            )
-        else:
+        # Simply create collection without schema if it doesn't exist
+        if not collection_exists:
             logger.info("Creating conversations collection...")
-            await db.create_collection(
-                "conversations",
-                validator={"$jsonSchema": conversation_schema},
-            )
+            await db.create_collection("conversations")
+            logger.info("Collection created successfully")
+        else:
+            logger.info("Conversations collection already exists")
 
         # Create or update indexes
         logger.info("Creating/updating indexes...")
