@@ -7,8 +7,9 @@ pydantic==2.5.2
 pydantic-settings==2.1.0
 
 # OpenAI/LangChain
-langchain==0.0.325
-langchain-openai==0.0.2
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-core>=0.1.0
 tiktoken>=0.5.2,<0.6.0
 
 # HTTP Client
