@@ -149,6 +149,13 @@ async def webhook(request: Request):
     try:
         data = await request.json()
 
+        # Get idempotency key from headers
+        idempotency_key = request.headers.get("X-FB-Request-Id")
+
+        if idempotency_key and webhook_handler.is_request_processed(idempotency_key):
+            logger.info(f"Skipping duplicate request {idempotency_key}")
+            return "OK"
+
         if not data or "entry" not in data:
             return "OK"
 
@@ -217,8 +224,8 @@ async def webhook(request: Request):
         return "OK"
 
     except Exception as e:
-        logger.error(f"Critical error in webhook: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal error")
+        logger.error(f"Error in webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/health")

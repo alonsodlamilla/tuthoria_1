@@ -62,13 +62,21 @@ class WebhookHandler:
         if not message_id:
             return False
 
-        # Skip if already processed or currently processing
-        if self.is_message_processed(message_id) or self.is_message_processing(
-            message_id
-        ):
-            logger.debug(f"Skipping message {message_id} - already handled")
+        # Add distributed locking mechanism
+        lock_key = f"processing_lock:{message_id}"
+
+        # Skip if already processed
+        if self.is_message_processed(message_id):
+            logger.debug(f"Skipping message {message_id} - already processed")
             return False
 
+        # Skip if currently processing
+        if self.is_message_processing(message_id):
+            logger.debug(f"Skipping message {message_id} - currently processing")
+            return False
+
+        # Acquire processing lock
+        self.mark_message_processing(message_id)
         return True
 
     def send_whatsapp_message(self, body: Dict[str, Any]) -> bool:
@@ -97,3 +105,11 @@ class WebhookHandler:
             "type": "text",
             "text": {"body": response},
         }
+
+    def is_request_processed(self, request_id: str) -> bool:
+        """Check if this request ID has been processed"""
+        if not request_id:
+            return False
+
+        # Use the same cache mechanism
+        return self.is_message_processed(f"req_{request_id}")
