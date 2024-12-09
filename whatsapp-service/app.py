@@ -6,7 +6,6 @@ import time
 from pydantic import BaseModel
 from typing import Optional
 
-from requests import request
 from services.chat_service import ChatService
 from handlers.webhook_handler import WebhookHandler
 
@@ -81,22 +80,24 @@ async def chat(request: ChatRequest):
 
 
 @app.get("/whatsapp")
-async def webhook_verify(
-    hub_mode: str = None, hub_verify_token: str = None, hub_challenge: str = None
-):
-    # Fix parameter names to match WhatsApp's query parameters
-    hub_mode = request.query_params.get("hub.mode")
-    hub_verify_token = request.query_params.get("hub.verify_token")
-    hub_challenge = request.query_params.get("hub.challenge")
+async def webhook_verify(request: Request):
+    try:
+        # Get parameters directly from the request object
+        hub_mode = request.query_params.get("hub.mode")
+        hub_verify_token = request.query_params.get("hub.verify_token")
+        hub_challenge = request.query_params.get("hub.challenge")
 
-    if hub_mode and hub_verify_token:
-        if hub_mode == "subscribe" and hub_verify_token == os.getenv(
-            "WHATSAPP_VERIFY_TOKEN"
-        ):
-            logger.info("WEBHOOK_VERIFIED")
-            return int(hub_challenge)
-        raise HTTPException(status_code=403, detail="Forbidden")
-    raise HTTPException(status_code=400, detail="Invalid verification request")
+        if hub_mode and hub_verify_token:
+            if hub_mode == "subscribe" and hub_verify_token == os.getenv(
+                "WHATSAPP_VERIFY_TOKEN"
+            ):
+                logger.info("WEBHOOK_VERIFIED")
+                return int(hub_challenge)
+            raise HTTPException(status_code=403, detail="Forbidden")
+        raise HTTPException(status_code=400, detail="Invalid verification request")
+    except Exception as e:
+        logger.error(f"Error in webhook verification: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.post("/whatsapp")
