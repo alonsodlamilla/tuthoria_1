@@ -2,6 +2,7 @@ import sys
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
+from contextlib import asynccontextmanager
 
 from shared.templates.prompts import TEMPLATES
 from services.db_client import DBClient
@@ -13,9 +14,26 @@ from logging_config import setup_logging
 # Setup logging
 setup_logging()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan events handler"""
+    # Startup
+    logger.info("Starting OpenAI service")
+    logger.info(f"Environment: {settings.ENVIRONMENT}")
+    logger.info(f"Debug mode: {settings.DEBUG}")
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down OpenAI service")
+    await db_client.close()
+
+
 app = FastAPI(
     title="TuthorIA OpenAI Service",
     description="AI-powered educational assistant service",
+    lifespan=lifespan,
 )
 settings = get_settings()
 
@@ -108,18 +126,3 @@ async def health_check():
         "environment": settings.ENVIRONMENT,
         "openai_configured": bool(settings.OPENAI_API_KEY),
     }
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    logger.info("Starting OpenAI service")
-    logger.info(f"Environment: {settings.ENVIRONMENT}")
-    logger.info(f"Debug mode: {settings.DEBUG}")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Clean up resources on shutdown"""
-    logger.info("Shutting down OpenAI service")
-    await db_client.close()
