@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     def mongodb_url(self) -> str:
         if self.environment == "test":
             return f"mongodb://{self.mongodb_user}:{self.mongodb_password}@{self.mongodb_host}/{self.database_name}"
-        return f"mongodb+srv://{self.mongodb_user}:{self.mongodb_password}@{self.mongodb_host}"
+        return f"mongodb+srv://{self.mongodb_user}:{self.mongodb_password}@{self.mongodb_host}/{self.database_name}"
 
     @property
     def database_name(self) -> str:
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
         return "chat_db"
 
     def get_mongodb_url(self) -> str:
-        return f"{self.mongodb_url}" "?retryWrites=true&w=majority" "&appName=Tuthoria"
+        return f"{self.mongodb_url}?retryWrites=true&w=majority&appName=Tuthoria"
 
 
 @lru_cache()
