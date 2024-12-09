@@ -21,6 +21,7 @@ class Message(BaseModel):
     content: str
     sender: str  # user_id or "assistant"
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    message_type: str = "text"
 
 
 class ConversationMessage(BaseModel):
@@ -28,6 +29,7 @@ class ConversationMessage(BaseModel):
     content: str
     sender: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    message_type: str = "text"
 
 
 class ConversationCreate(BaseModel):

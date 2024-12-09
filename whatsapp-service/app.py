@@ -148,8 +148,6 @@ async def webhook_verify(request: Request):
 async def webhook(request: Request):
     try:
         data = await request.json()
-
-        # Get idempotency key from headers
         idempotency_key = request.headers.get("X-FB-Request-Id")
 
         if idempotency_key and webhook_handler.is_request_processed(idempotency_key):
@@ -165,12 +163,7 @@ async def webhook(request: Request):
 
             for change in entry["changes"]:
                 value = change.get("value", {})
-
-                # Skip status updates
-                if "statuses" in value:
-                    continue
-
-                if "messages" not in value:
+                if "statuses" in value or "messages" not in value:
                     continue
 
                 for message in value["messages"]:
@@ -178,12 +171,11 @@ async def webhook(request: Request):
                         continue
 
                     message_id = message["id"]
-
                     try:
                         user_id = message["from"]
                         message_text = message["text"]["body"]
 
-                        # Store message first
+                        # Store user message first
                         await chat_service.store_message(
                             user_id, message_text, is_user=True
                         )
@@ -194,6 +186,7 @@ async def webhook(request: Request):
                         )
 
                         if response:
+                            # Send response back to user
                             message_data = webhook_handler.create_message_body(
                                 user_id, response
                             )
@@ -211,9 +204,7 @@ async def webhook(request: Request):
                             f"Error processing message {message_id}: {str(e)}",
                             exc_info=True,
                         )
-                        webhook_handler.mark_message_processed(
-                            message_id
-                        )  # Mark as processed even if failed
+                        webhook_handler.mark_message_processed(message_id)
                         error_data = webhook_handler.create_message_body(
                             user_id,
                             "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta nuevamente.",

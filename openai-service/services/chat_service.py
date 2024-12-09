@@ -60,14 +60,19 @@ class ChatService:
             response = await self.llm.ainvoke(messages)
             logger.debug(f"Raw LLM response: {response}")
 
+            # Store the response in DB
+            try:
+                await self.db_client.store_message(
+                    user_id=user_id, content=response.content, is_user=False
+                )
+            except Exception as e:
+                logger.error(f"Failed to store AI response: {str(e)}")
+
             logger.info(f"Successfully processed message for user {user_id}")
             return response.content
 
         except Exception as e:
             logger.error(f"Error in process_message: {str(e)}", exc_info=True)
-            logger.error(f"Input message: {message}")
-            logger.error(f"User ID: {user_id}")
-            logger.error(f"History length: {len(history)}")
             raise
 
     def _format_history(self, history: List[Dict]) -> List[BaseMessage]:
