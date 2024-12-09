@@ -1,19 +1,16 @@
-import os
 import logging
-import requests
 from typing import Dict
+from config import get_settings
+import requests
 
 logger = logging.getLogger(__name__)
 
 
 class ChatService:
     def __init__(self):
-        self.openai_service_url = os.getenv("OPENAI_SERVICE_URL")
-        self.db_service_url = os.getenv("DB_SERVICE_URL")
-        if not self.openai_service_url:
-            raise ValueError("OPENAI_SERVICE_URL not configured")
-        if not self.db_service_url:
-            raise ValueError("DB_SERVICE_URL not configured")
+        self.settings = get_settings()
+        self.openai_service_url = self.settings.build_service_url("openai")
+        self.db_service_url = self.settings.build_service_url("db")
 
     async def send_message_to_openai(self, message: str, user_id: str) -> str:
         """Send message to OpenAI service and get response"""
