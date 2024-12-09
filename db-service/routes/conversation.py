@@ -5,12 +5,14 @@ from datetime import datetime
 from bson import ObjectId
 
 router = APIRouter()
-db = get_database()
 
 
 @router.post("/conversations/messages")
 async def add_message(message: ConversationMessage):
     try:
+        # Get database connection
+        db = await get_database()
+
         # Find existing conversation or create new one
         conversation = await db.conversations.find_one({"user_id": message.user_id})
 
@@ -55,12 +57,15 @@ async def add_message(message: ConversationMessage):
 @router.get("/conversations/{user_id}")
 async def get_conversation_history(user_id: str, limit: int = 10):
     try:
+        # Get database connection
+        db = await get_database()
+
         conversation = await db.conversations.find_one({"user_id": user_id})
         if not conversation:
             return {"messages": []}
 
-        messages = conversation.get("messages", [])
-        return {"messages": messages[-limit:] if limit else messages}
+        messages = conversation.get("messages", [])[-limit:]
+        return {"messages": messages}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
