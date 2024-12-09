@@ -5,7 +5,7 @@ import logging
 import time
 from pydantic import BaseModel
 from typing import Optional
-import httpx
+import aiohttp
 import asyncio
 from contextlib import asynccontextmanager
 
@@ -23,13 +23,18 @@ load_dotenv()
 async def check_service_health(service_url: str, service_name: str) -> bool:
     """Check if a service is healthy"""
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{service_url}/health")
-            if response.status_code == 200:
-                logger.info(f"{service_name} service is healthy")
-                return True
-            logger.error(f"{service_name} service health check failed: {response.text}")
-            return False
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{service_url}/health", timeout=5) as response:
+                if response.status == 200:
+                    logger.info(f"{service_name} service is healthy")
+                    return True
+                logger.error(
+                    f"{service_name} service health check failed: {await response.text()}"
+                )
+                return False
+    except asyncio.TimeoutError:
+        logger.error(f"{service_name} service health check timed out")
+        return False
     except Exception as e:
         logger.error(f"Error checking {service_name} health: {str(e)}")
         return False
