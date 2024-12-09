@@ -43,10 +43,15 @@ async def init_db():
         db = client[db_name]
         logger.info(f"Using database: {db_name}")
 
-        # Drop existing collection if --force flag is used
-        if os.getenv("DROP_EXISTING", "false").lower() == "true":
+        # Check if collection exists first
+        collections = await db.list_collection_names()
+        collection_exists = "conversations" in collections
+
+        # Drop if force flag is set
+        if os.getenv("DROP_EXISTING", "false").lower() == "true" and collection_exists:
             logger.warning("Dropping existing collection...")
             await db.conversations.drop()
+            collection_exists = False
 
         # Define schema
         conversation_schema = {
@@ -77,9 +82,7 @@ async def init_db():
             },
         }
 
-        # Check if collection exists and update schema
-        collections = await db.list_collection_names()
-        if "conversations" in collections:
+        if collection_exists:
             logger.info("Updating existing conversations collection schema...")
             await db.command(
                 {
@@ -101,7 +104,7 @@ async def init_db():
         await db.conversations.create_index([("updated_at", -1)])
 
         # Create test conversation if in development
-        if os.getenv("ENVIRONMENT") == "development":
+        if os.getenv("ENVIRONMENT") == "development" and not collection_exists:
             logger.info("Creating test conversation...")
             test_conversation = {
                 "user_id": "test_user",
