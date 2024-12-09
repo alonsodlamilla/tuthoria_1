@@ -5,10 +5,11 @@ import os
 from dotenv import load_dotenv
 import certifi
 from datetime import datetime
+from pymongo.errors import CollectionInvalid
 
 
 async def init_db():
-    """Initialize database with proper collections and indexes for conversation storage."""
+    """Initialize database with conversations collection and schema validation."""
     try:
         # Load environment variables
         load_dotenv()
@@ -42,61 +43,62 @@ async def init_db():
         db = client[db_name]
         logger.info(f"Using database: {db_name}")
 
-        # Drop existing collections if --force flag is used
+        # Drop existing collection if --force flag is used
         if os.getenv("DROP_EXISTING", "false").lower() == "true":
-            logger.warning("Dropping existing collections...")
+            logger.warning("Dropping existing collection...")
             await db.conversations.drop()
-            await db.user_states.drop()
 
-        # Create conversations collection with schema validation
-        logger.info("Setting up conversations collection...")
-        await db.create_collection(
-            "conversations",
-            validator={
-                "$jsonSchema": {
-                    "bsonType": "object",
-                    "required": ["user_id", "messages", "created_at", "updated_at"],
-                    "properties": {
-                        "user_id": {"bsonType": "string"},
-                        "messages": {
-                            "bsonType": "array",
-                            "items": {
-                                "bsonType": "object",
-                                "required": [
-                                    "content",
-                                    "sender",
-                                    "timestamp",
-                                    "message_type",
-                                ],
-                                "properties": {
-                                    "content": {"bsonType": "string"},
-                                    "sender": {"bsonType": "string"},
-                                    "timestamp": {"bsonType": "date"},
-                                    "message_type": {"bsonType": "string"},
-                                },
-                            },
+        # Define schema
+        conversation_schema = {
+            "bsonType": "object",
+            "required": ["user_id", "messages", "created_at", "updated_at"],
+            "properties": {
+                "user_id": {"bsonType": "string"},
+                "messages": {
+                    "bsonType": "array",
+                    "items": {
+                        "bsonType": "object",
+                        "required": [
+                            "content",
+                            "sender",
+                            "timestamp",
+                            "message_type",
+                        ],
+                        "properties": {
+                            "content": {"bsonType": "string"},
+                            "sender": {"bsonType": "string"},
+                            "timestamp": {"bsonType": "date"},
+                            "message_type": {"bsonType": "string"},
                         },
-                        "created_at": {"bsonType": "date"},
-                        "updated_at": {"bsonType": "date"},
                     },
-                }
+                },
+                "created_at": {"bsonType": "date"},
+                "updated_at": {"bsonType": "date"},
             },
-        )
+        }
 
-        # Create indexes
-        logger.info("Creating indexes...")
+        # Check if collection exists and update schema
+        collections = await db.list_collection_names()
+        if "conversations" in collections:
+            logger.info("Updating existing conversations collection schema...")
+            await db.command(
+                {
+                    "collMod": "conversations",
+                    "validator": {"$jsonSchema": conversation_schema},
+                    "validationLevel": "strict",
+                }
+            )
+        else:
+            logger.info("Creating conversations collection...")
+            await db.create_collection(
+                "conversations",
+                validator={"$jsonSchema": conversation_schema},
+            )
+
+        # Create or update indexes
+        logger.info("Creating/updating indexes...")
         await db.conversations.create_index([("user_id", 1)], unique=True)
         await db.conversations.create_index([("updated_at", -1)])
-        await db.conversations.create_index([("user_id", 1), ("updated_at", -1)])
-
-        # Create user_states collection
-        logger.info("Setting up user_states collection...")
-        await db.create_collection("user_states")
-        await db.user_states.create_index([("user_id", 1)], unique=True)
-
-        # Verify setup
-        collections = await db.list_collection_names()
-        logger.success(f"Initialized collections: {collections}")
 
         # Create test conversation if in development
         if os.getenv("ENVIRONMENT") == "development":
@@ -114,7 +116,10 @@ async def init_db():
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow(),
             }
-            await db.conversations.insert_one(test_conversation)
+            try:
+                await db.conversations.insert_one(test_conversation)
+            except Exception as e:
+                logger.warning(f"Could not create test conversation: {str(e)}")
 
         # Close connection
         client.close()
