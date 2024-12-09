@@ -4,7 +4,7 @@ from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
-from langchain.chains.llm import LLMChain
+from langchain_core.runnables import RunnablePassthrough
 from shared.templates.prompts import SYSTEM_PROMPT
 
 
@@ -36,15 +36,12 @@ class ChatService:
             # Format history into messages
             chat_history = self._format_history(history)
 
-            # Create chain with new pattern
-            chain = LLMChain(llm=self.llm, prompt=self.prompt, verbose=True)
-
-            # Run chain with proper async call
-            response = await chain.ainvoke(
+            # Run chain
+            response = await self.llm.ainvoke(
                 {"chat_history": chat_history, "input": message}
             )
 
-            return response["text"]
+            return response.content
 
         except Exception as e:
             logger.error(f"Error in process_message: {str(e)}")

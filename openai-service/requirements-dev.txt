@@ -8,3 +8,4 @@ flake8==6.1.0
 isort==5.12.0
 mypy==1.7.1
 watchfiles==0.21.0  # For better reload performance
+mongomock==4.1.2

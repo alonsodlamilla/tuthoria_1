@@ -7,7 +7,7 @@ from datetime import datetime
 
 from app import app
 from services.chat_service import ChatService
-from services.db_service import DBService
+from services.db_client import DBClient
 
 
 @pytest.fixture
@@ -24,40 +24,27 @@ def mock_mongo():
 
 
 @pytest.fixture
-def mock_db_service(mock_mongo):
-    """Mocked DB service"""
-    with patch("services.db_service.MongoClient") as mock_client:
+def mock_db_client(mock_mongo):
+    """Mocked DB client"""
+    with patch("services.db_client.MongoClient") as mock_client:
         mock_client.return_value = mock_mongo
-        db_service = DBService()
-        yield db_service
+        db_client = DBClient()
+        yield db_client
 
 
 @pytest.fixture
 def mock_chat_service():
     """Mocked Chat service"""
-    with patch("services.chat_service.OpenAI"), patch(
-        "services.chat_service.ChatOpenAI"
-    ):
+    with patch("services.chat_service.ChatOpenAI") as mock_llm:
+        # Create a mock chain that returns a string response
+        mock_chain = MagicMock()
+        mock_chain.ainvoke = MagicMock()
+        mock_chain.ainvoke.return_value = "Test response"
+
+        # Create the chat service and replace its chain
         chat_service = ChatService()
-        chat_service.get_completion = MagicMock()
-        chat_service.get_langchain_response = MagicMock()
+        chat_service.chain = mock_chain
         yield chat_service
-
-
-@pytest.fixture
-def sample_user_data():
-    """Sample user data for tests"""
-    return {
-        "user_id": "test_user_123",
-        "message": "Hello, how are you?",
-        "response": "I'm doing well, thank you!",
-        "current_state": "INICIO",
-        "context": {
-            "anio": "3° año",
-            "curso": "Matemática",
-            "seccion": "A",
-        },
-    }
 
 
 @pytest.fixture

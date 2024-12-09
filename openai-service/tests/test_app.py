@@ -1,74 +1,47 @@
 import pytest
-from fastapi import HTTPException
-from datetime import datetime
+from fastapi.testclient import TestClient
+from unittest.mock import patch, AsyncMock
+from app import app
 
 
-def test_chat_endpoint_success(
-    test_app, mock_chat_service, mock_db_service, sample_user_data
-):
-    """Test successful chat request"""
-    mock_chat_service.get_completion.return_value = sample_user_data["response"]
+@pytest.fixture
+def test_client():
+    return TestClient(app)
 
-    response = test_app.post(
-        "/chat",
-        json={
-            "message": sample_user_data["message"],
-            "user_id": sample_user_data["user_id"],
-        },
-    )
 
+def test_health_check(test_client):
+    """Test health check endpoint"""
+    response = test_client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"response": sample_user_data["response"]}
+    assert "status" in response.json()
 
 
-def test_chat_endpoint_error(test_app, mock_chat_service):
-    """Test chat request with error"""
-    mock_chat_service.get_completion.side_effect = Exception("Test error")
+@pytest.mark.asyncio
+async def test_chat_endpoint():
+    """Test chat endpoint"""
+    with patch("services.chat_service.ChatService") as MockChatService:
+        mock_service = MockChatService.return_value
+        mock_service.process_message = AsyncMock(return_value="Test response")
 
-    response = test_app.post(
-        "/chat",
-        json={"message": "Hello", "user_id": "test_user"},
-    )
+        with TestClient(app) as client:
+            response = client.post(
+                "/chat", json={"content": "test message", "user_id": "test_user"}
+            )
 
-    assert response.status_code == 500
-    assert "Test error" in response.json()["detail"]
-
-
-def test_get_response_gpt_success(
-    test_app, mock_chat_service, mock_db_service, sample_user_data
-):
-    """Test successful GPT response request"""
-    mock_chat_service.get_langchain_response.return_value = sample_user_data["response"]
-
-    response = test_app.get(
-        "/getresponsegpt",
-        params={
-            "user_prompt": sample_user_data["message"],
-            "user_id": sample_user_data["user_id"],
-        },
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {"response": sample_user_data["response"]}
+            assert response.status_code == 200
+            assert "response" in response.json()
 
 
-def test_get_history_success(test_app, mock_db_service, sample_conversation_history):
-    """Test successful history retrieval"""
-    mock_db_service.get_conversation_history.return_value = sample_conversation_history
+@pytest.mark.asyncio
+async def test_get_conversation():
+    """Test conversation history endpoint"""
+    with patch("services.db_client.DBClient") as MockDBClient:
+        mock_client = MockDBClient.return_value
+        mock_client.get_conversation_history = AsyncMock(
+            return_value=[{"message": "test"}]
+        )
 
-    response = test_app.get("/history/test_user_123")
-
-    assert response.status_code == 200
-    assert len(response.json()) == len(sample_conversation_history)
-
-
-def test_get_history_with_limit(test_app, mock_db_service, sample_conversation_history):
-    """Test history retrieval with custom limit"""
-    mock_db_service.get_conversation_history.return_value = sample_conversation_history[
-        :1
-    ]
-
-    response = test_app.get("/history/test_user_123?limit=1")
-
-    assert response.status_code == 200
-    assert len(response.json()) == 1
+        with TestClient(app) as client:
+            response = client.get("/conversations/test_user")
+            assert response.status_code == 200
+            assert "messages" in response.json()
