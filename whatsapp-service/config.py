@@ -47,8 +47,12 @@ class Settings(BaseSettings):
 
         # In production (Railway), we don't include the port in the URL
         if self.environment == "production":
+            # For HTTPS, we don't need to specify port 443 as it's the default
             return f"{protocol}://{domain}{path}"
 
+        # In development, we use the specified ports
+        if protocol == "https" and port == 443:
+            return f"{protocol}://{domain}{path}"
         return f"{protocol}://{domain}:{port}{path}"
 
 
