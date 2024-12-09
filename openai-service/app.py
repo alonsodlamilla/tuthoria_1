@@ -88,13 +88,10 @@ async def chat_endpoint(message: Message):
             message.content, message.user_id, history
         )
 
-        # Log conversation
+        # Store both user message and response
         logger.debug("Storing conversation in DB")
-        success = await db_client.log_conversation(
-            message.user_id, message.content, response
-        )
-        if not success:
-            logger.warning(f"Failed to log conversation for user {message.user_id}")
+        await db_client.store_message(message.user_id, message.content, is_user=True)
+        await db_client.store_message(message.user_id, response, is_user=False)
 
         logger.info(f"Successfully processed message for user {message.user_id}")
         return ChatResponse(response=response)
