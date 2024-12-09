@@ -21,21 +21,61 @@ logger = logging.getLogger(__name__)
 # Cargar variables de entorno
 load_dotenv()
 
+# At the top after imports and before ServiceConfig class
+# Add environment validation
+required_env_vars = [
+    "PORT",
+    "DB_SERVICE_PORT",
+    "OPENAI_SERVICE_PORT",
+    "DB_SERVICE_DOMAIN",
+    "OPENAI_SERVICE_DOMAIN",
+    "DB_SERVICE_PROTOCOL",
+    "OPENAI_SERVICE_PROTOCOL",
+    "WHATSAPP_VERIFY_TOKEN",
+    "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_API_VERSION",
+    "WHATSAPP_NUMBER_ID",
+]
+
+missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+if missing_vars:
+    raise ValueError(
+        f"Missing required environment variables: {', '.join(missing_vars)}"
+    )
+
+
+# URL builders
+def build_service_url(protocol: str, domain: str, port: int, path: str = "") -> str:
+    return f"{protocol}://{domain}:{port}{path}"
+
+
+def build_whatsapp_api_url() -> str:
+    version = os.getenv("WHATSAPP_API_VERSION")
+    number_id = os.getenv("WHATSAPP_NUMBER_ID")
+    return f"https://graph.facebook.com/{version}/{number_id}/messages"
+
 
 class ServiceConfig:
     """Service configuration and health check settings"""
 
-    def __init__(self, name: str, display_name: str, port: int):
+    def __init__(self, name: str, display_name: str):
         self.name = name
         self.display_name = display_name
-        self.port = port
-        self.host = f"{name}.railway.internal"
-        self.health_url = f"http://{self.host}:{port}/health"
+
+        # Get environment variables for this service
+        self.protocol = os.getenv(f"{name.upper()}_PROTOCOL")
+        self.domain = os.getenv(f"{name.upper()}_DOMAIN")
+        self.port = int(os.getenv(f"{name.upper()}_PORT"))
+
+        # Build the health URL
+        self.health_url = build_service_url(
+            self.protocol, self.domain, self.port, "/health"
+        )
 
 
 SERVICES: List[ServiceConfig] = [
-    ServiceConfig("db-service", "Database", 8000),
-    ServiceConfig("openai-service", "OpenAI", 8502),
+    ServiceConfig("db-service", "Database"),
+    ServiceConfig("openai-service", "OpenAI"),
 ]
 
 
