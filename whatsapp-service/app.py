@@ -44,8 +44,7 @@ async def check_service_health(service: ServiceConfig) -> bool:
     try:
         connector = aiohttp.TCPConnector(
             family=socket.AF_INET6,  # Force IPv6
-            ssl=False,  # Internal traffic doesn't need SSL
-            verify_ssl=False,
+            ssl=None,  # Disable SSL completely for internal traffic
         )
 
         async with aiohttp.ClientSession(connector=connector) as session:
