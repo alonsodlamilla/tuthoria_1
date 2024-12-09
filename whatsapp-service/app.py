@@ -4,10 +4,12 @@ from dotenv import load_dotenv
 import logging
 import time
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Tuple
 import aiohttp
 import asyncio
 from contextlib import asynccontextmanager
+import socket
+from loguru import logger
 
 from services.chat_service import ChatService
 from handlers.webhook_handler import WebhookHandler
@@ -20,23 +22,50 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
-async def check_service_health(service_url: str, service_name: str) -> bool:
-    """Check if a service is healthy"""
+class ServiceConfig:
+    """Service configuration and health check settings"""
+
+    def __init__(self, name: str, display_name: str, port: int):
+        self.name = name
+        self.display_name = display_name
+        self.port = port
+        self.host = f"{name}.railway.internal"
+        self.health_url = f"http://[{self.host}]:{port}/health"
+
+
+SERVICES: List[ServiceConfig] = [
+    ServiceConfig("db-service", "Database", 8000),
+    ServiceConfig("openai-service", "OpenAI", 8502),
+]
+
+
+async def check_service_health(service: ServiceConfig) -> bool:
+    """Check if a service is healthy using IPv6"""
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{service_url}/health", timeout=5) as response:
-                if response.status == 200:
-                    logger.info(f"{service_name} service is healthy")
-                    return True
-                logger.error(
-                    f"{service_name} service health check failed: {await response.text()}"
-                )
+        connector = aiohttp.TCPConnector(
+            family=socket.AF_INET6,  # Force IPv6
+            ssl=False,  # Internal traffic doesn't need SSL
+            verify_ssl=False,
+        )
+
+        async with aiohttp.ClientSession(connector=connector) as session:
+            try:
+                async with session.get(service.health_url, timeout=5) as response:
+                    if response.status == 200:
+                        logger.info(
+                            f"{service.display_name} service is healthy at {service.health_url}"
+                        )
+                        return True
+                    logger.error(
+                        f"{service.display_name} service health check failed: {await response.text()}"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to connect to {service.health_url}: {str(e)}")
                 return False
-    except asyncio.TimeoutError:
-        logger.error(f"{service_name} service health check timed out")
+
         return False
     except Exception as e:
-        logger.error(f"Error checking {service_name} health: {str(e)}")
+        logger.error(f"Error checking {service.display_name} health: {str(e)}")
         return False
 
 
@@ -44,21 +73,15 @@ async def check_service_health(service_url: str, service_name: str) -> bool:
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     # Check services health on startup
-    services = [
-        (os.getenv("DB_SERVICE_URL"), "Database"),
-        (os.getenv("OPENAI_SERVICE_URL"), "OpenAI"),
-    ]
-
     health_results = await asyncio.gather(
-        *[check_service_health(url, name) for url, name in services]
+        *[check_service_health(service) for service in SERVICES]
     )
 
     if not all(health_results):
         logger.error("Not all required services are healthy")
-        # You can choose to raise an exception here if you want to prevent startup
-        # raise RuntimeError("Required services are not healthy")
+        # You might want to add specific handling for unhealthy services
 
-    logger.info("All services are healthy, starting WhatsApp service")
+    logger.info("Starting WhatsApp service")
     yield
     logger.info("Shutting down WhatsApp service")
 
