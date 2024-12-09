@@ -1,56 +1,51 @@
-import os
 from typing import Dict, List
-import logging
-from langchain_openai import ChatOpenAI
+import os
+from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.chains import LLMChain
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_openai import ChatOpenAI
+from langchain.chains.llm import LLMChain
 from shared.templates.prompts import SYSTEM_PROMPT
 
-logger = logging.getLogger(__name__)
 
 class ChatService:
     def __init__(self):
+        # Initialize the ChatOpenAI model with proper configuration
         self.llm = ChatOpenAI(
-            model="gpt-4",
+            model_name="gpt-4",
             temperature=0.7,
             max_tokens=1000,
-            api_key=os.getenv("OPENAI_API_KEY")
+            api_key=os.getenv("OPENAI_API_KEY"),
+            streaming=True,
         )
-        
+
         # Initialize prompt template with external system prompt
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", SYSTEM_PROMPT),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{input}")
-        ])
+        self.prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", SYSTEM_PROMPT),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("human", "{input}"),
+            ]
+        )
 
     async def process_message(
-        self,
-        message: str,
-        user_id: str,
-        history: List[Dict]
+        self, message: str, user_id: str, history: List[Dict]
     ) -> str:
         """Process a message using LangChain"""
         try:
             # Format history into messages
             chat_history = self._format_history(history)
-            
-            # Create chain
-            chain = LLMChain(
-                llm=self.llm,
-                prompt=self.prompt,
-                verbose=True
+
+            # Create chain with new pattern
+            chain = LLMChain(llm=self.llm, prompt=self.prompt, verbose=True)
+
+            # Run chain with proper async call
+            response = await chain.ainvoke(
+                {"chat_history": chat_history, "input": message}
             )
-            
-            # Run chain
-            response = await chain.ainvoke({
-                "chat_history": chat_history,
-                "input": message
-            })
-            
+
             return response["text"]
-            
+
         except Exception as e:
             logger.error(f"Error in process_message: {str(e)}")
             raise
