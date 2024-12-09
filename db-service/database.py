@@ -3,6 +3,7 @@ from loguru import logger
 from config import get_settings
 import certifi
 from typing import Any
+import asyncio
 
 
 class Database:
@@ -13,22 +14,39 @@ class Database:
 
 async def connect_to_database():
     """Connect to MongoDB database."""
-    try:
-        logger.info("Connecting to MongoDB...")
+    retry_count = 0
+    max_retries = 3
 
-        Database.client = AsyncIOMotorClient(
-            Database.settings.get_mongodb_url(),
-            serverSelectionTimeoutMS=5000,
-            tlsCAFile=certifi.where(),
-        )
+    while retry_count < max_retries:
+        try:
+            logger.info(
+                f"Connecting to MongoDB (attempt {retry_count + 1}/{max_retries})..."
+            )
+            logger.debug(f"Connection URL: {Database.settings.get_mongodb_url()}")
 
-        # Verify connection
-        await Database.client.admin.command("ping")
-        logger.success("Successfully connected to MongoDB")
+            Database.client = AsyncIOMotorClient(
+                Database.settings.get_mongodb_url(),
+                serverSelectionTimeoutMS=5000,
+                tlsCAFile=certifi.where(),
+            )
 
-    except Exception as e:
-        logger.error(f"Failed to connect to MongoDB: {str(e)}")
-        raise
+            # Verify connection
+            await Database.client.admin.command("ping")
+            logger.success("Successfully connected to MongoDB")
+            return
+
+        except Exception as e:
+            retry_count += 1
+            logger.error(
+                f"Failed to connect to MongoDB (attempt {retry_count}/{max_retries}): {str(e)}"
+            )
+            if retry_count < max_retries:
+                await asyncio.sleep(2**retry_count)  # Exponential backoff
+            else:
+                logger.critical(
+                    "Maximum retry attempts reached. Could not connect to MongoDB"
+                )
+                raise
 
 
 async def close_database_connection():
