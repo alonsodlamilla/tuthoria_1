@@ -56,6 +56,8 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down WhatsApp service")
 
 
+#
+
 app = FastAPI(
     title="TuthorIA WhatsApp Service",
     description="WhatsApp integration service for TuthorIA educational assistant",
@@ -147,7 +149,7 @@ async def webhook(request: Request):
     try:
         # Parse incoming webhook data
         data = await request.json()
-        logger.info("Webhook received data: %s", data)
+        # logger.info("Webhook received data: %s", data)
 
         if not data:
             logger.error("No data received")
