@@ -167,19 +167,11 @@ async def webhook(request: Request):
                     continue
 
                 for message in value["messages"]:
-                    # Only process text messages
-                    if message.get("type") != "text":
+                    if not webhook_handler.should_process_message(message):
                         continue
 
-                    message_id = message.get("id")
-                    if not message_id:
-                        continue
-
-                    # Skip if already processed
-                    if webhook_handler.is_message_processed(message_id):
-                        continue
-
-                    webhook_handler.mark_message_processed(message_id)
+                    message_id = message["id"]
+                    webhook_handler.mark_message_processing(message_id)
 
                     try:
                         user_id = message["from"]
@@ -190,7 +182,7 @@ async def webhook(request: Request):
                             user_id, message_text, is_user=True
                         )
 
-                        # Get AI response with increased timeout
+                        # Get AI response
                         response = await chat_service.send_message_to_openai(
                             message_text, user_id
                         )
@@ -199,13 +191,23 @@ async def webhook(request: Request):
                             message_data = webhook_handler.create_message_body(
                                 user_id, response
                             )
-                            webhook_handler.send_whatsapp_message(message_data)
+                            if webhook_handler.send_whatsapp_message(message_data):
+                                webhook_handler.mark_message_processed(
+                                    message_id, response
+                                )
+                            else:
+                                logger.error(
+                                    f"Failed to send response for message {message_id}"
+                                )
 
                     except Exception as e:
                         logger.error(
                             f"Error processing message {message_id}: {str(e)}",
                             exc_info=True,
                         )
+                        webhook_handler.mark_message_processed(
+                            message_id
+                        )  # Mark as processed even if failed
                         error_data = webhook_handler.create_message_body(
                             user_id,
                             "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta nuevamente.",
