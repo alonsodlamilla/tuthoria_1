@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from datetime import datetime, timezone
 import sys
+from langchain_core.messages import HumanMessage, AIMessage
 
 # Mock all langchain imports
 mock_langchain = {
@@ -93,7 +94,7 @@ async def test_trim_history_partial(chat_service):
         msg.content = "x" * 1000
         messages.append(msg)
 
-    result = await chat_service._trim_history_to_fit(messages, "new message")
+    result = chat_service._trim_history_to_fit(messages, "new message")
     assert len(result) < len(messages)
     assert isinstance(result, list)
     assert result[-1].content == "x" * 1000
@@ -198,16 +199,44 @@ async def test_close(chat_service):
 @pytest.mark.asyncio
 async def test_format_history_error(chat_service):
     """Test history formatting with error"""
-    # Create history that will cause an error when sorting
+    # Create a mock timestamp that raises an exception when compared
+    timestamp_mock = MagicMock()
+    error_msg = "Timestamp error"
+    # Mock all comparison methods to raise an exception
+    timestamp_mock.__lt__ = MagicMock(side_effect=Exception(error_msg))
+    timestamp_mock.__gt__ = MagicMock(side_effect=Exception(error_msg))
+    timestamp_mock.__le__ = MagicMock(side_effect=Exception(error_msg))
+    timestamp_mock.__ge__ = MagicMock(side_effect=Exception(error_msg))
+    timestamp_mock.__eq__ = MagicMock(side_effect=Exception(error_msg))
+
     malformed_history = [
-        {
-            "content": "Hello",
-            "sender": "user",
-            # Create a situation where timestamp access raises an error
-            "timestamp": MagicMock(side_effect=Exception("Timestamp error")),
-        }
+        {"content": "Hello", "sender": "user", "timestamp": timestamp_mock},
+        {"content": "World", "sender": "user", "timestamp": "2024-01-01T00:00:00"},
     ]
 
     with pytest.raises(Exception) as exc_info:
         chat_service._format_history(malformed_history)
-    assert "Error formatting history" in str(exc_info.value)
+
+    assert error_msg in str(exc_info.value)
+
+
+def test_format_history_malformed_messages(chat_service):
+    """Test history formatting with malformed messages"""
+    history = [
+        "not a dict",  # non-dict message
+        {"sender": "user", "timestamp": "2024-01-01T00:00:00"},  # missing content
+        {
+            "content": "valid",
+            "sender": "user",
+            "timestamp": "2024-01-01T00:00:00",
+        },  # valid message
+    ]
+
+    # Create a real HumanMessage instance for the mock to return
+    human_msg = HumanMessage(content="valid")
+
+    with patch("services.chat_service.HumanMessage", return_value=human_msg):
+        result = chat_service._format_history(history)
+        assert len(result) == 1  # Only the valid message should be included
+        assert isinstance(result[0], HumanMessage)
+        assert result[0].content == "valid"

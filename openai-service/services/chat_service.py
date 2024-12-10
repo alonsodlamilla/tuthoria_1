@@ -117,8 +117,19 @@ class ChatService:
         logger.debug(f"Formatting history of length: {len(history)}")
         try:
             chat_history = []
+            # Filter out messages without required fields first
+            valid_history = []
+            for msg in history:
+                if not isinstance(msg, dict):
+                    logger.warning(f"Skipping non-dict message: {msg}")
+                    continue
+                if "timestamp" not in msg:
+                    logger.warning(f"Skipping message without timestamp: {msg}")
+                    continue
+                valid_history.append(msg)
+
             # Sort messages by timestamp to ensure chronological order
-            sorted_history = sorted(history, key=lambda x: x["timestamp"])
+            sorted_history = sorted(valid_history, key=lambda x: x["timestamp"])
 
             for msg in sorted_history:
                 if not msg.get("content"):
