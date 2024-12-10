@@ -16,7 +16,7 @@ class DBClient:
         self.client = httpx.AsyncClient(timeout=30.0)
 
     async def get_conversation_history(
-        self, user_id: str, limit: int = 10
+        self, user_id: str, limit: int = 50
     ) -> List[dict]:
         """Get conversation history from DB service"""
         logger.info(f"Getting conversation history for user {user_id}")
