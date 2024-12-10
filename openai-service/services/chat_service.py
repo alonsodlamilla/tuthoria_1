@@ -13,7 +13,7 @@ class ChatService:
     def __init__(self):
         logger.info("Initializing ChatService")
         try:
-            # Initialize DB client
+            # Initialize DB client (only for reading history)
             self.db_client = DBClient()
             logger.debug("DB client initialized successfully")
 
@@ -65,17 +65,6 @@ class ChatService:
             response = await self.llm.ainvoke(messages)
             logger.debug(f"Raw LLM response: {response}")
 
-            # Store the response in DB
-            try:
-                await self.db_client.store_message(
-                    user_id=user_id,
-                    content=response.content,
-                    sender="assistant",
-                    message_type="text",
-                )
-            except Exception as e:
-                logger.error(f"Failed to store AI response: {str(e)}")
-
             logger.info(f"Successfully processed message for user {user_id}")
             return response.content
 
@@ -103,3 +92,8 @@ class ChatService:
             logger.error(f"Error formatting history: {str(e)}", exc_info=True)
             logger.error(f"Raw history: {history}")
             raise
+
+    async def close(self):
+        """Close the service and its clients"""
+        logger.info("Closing ChatService")
+        await self.db_client.close()
