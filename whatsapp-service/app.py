@@ -1,6 +1,6 @@
 import os
 import time
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Response
 import logging
 import aiohttp
 import asyncio
@@ -52,11 +52,15 @@ async def lifespan(app: FastAPI):
     if not all(health_results):
         logger.error("Not all required services are healthy")
 
+    # Initialize services
+    app.chat_service = ChatService()
+    app.webhook_handler = WebhookHandler()
     yield
+    # Cleanup
+    await app.chat_service.close()
+    await app.webhook_handler.close()
     logger.info("Shutting down WhatsApp service")
 
-
-#
 
 app = FastAPI(
     title="TuthorIA WhatsApp Service",
@@ -64,9 +68,6 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
-
-chat_service = ChatService()
-webhook_handler = WebhookHandler()
 
 
 # Pydantic models
@@ -89,54 +90,44 @@ async def chat(request: ChatRequest):
         message_type = request.message_type
         model = "gpt-4"
 
-        # Get conversation history
-        chat_service.get_or_create_history(user_id)
-
-        # Get response from OpenAI
-        response = await chat_service.send_message_to_openai(message, user_id)
-
-        # Log user message
-        conversation_id = chat_service.log_conversation(
-            user_id=user_id,
-            role="user",
-            message=message,
-            message_type=message_type,
-            response_time=time.time() - start_time,
-            model_version=model,
+        # Store user message
+        await app.chat_service.store_message(
+            user_id=user_id, content=message, sender=user_id, message_type=message_type
         )
 
-        # Log assistant response
-        chat_service.log_conversation(
+        # Get response from OpenAI
+        response = await app.chat_service.send_message_to_openai(message, user_id)
+
+        # Store assistant response
+        await app.chat_service.store_message(
             user_id=user_id,
-            role="assistant",
-            message=response,
+            content=response,
+            sender="assistant",
             message_type=message_type,
-            response_time=time.time() - start_time,
-            model_version=model,
-            conversation_id=conversation_id,
         )
 
         return {"response": response}
 
     except Exception as e:
-        logger.error(f"Error en chat: {str(e)}")
+        logger.error(f"Error in chat: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/whatsapp")
 async def webhook_verify(request: Request):
     try:
-        # Get parameters directly from the request object
+        # Get parameters from the request
         hub_mode = request.query_params.get("hub.mode")
         hub_verify_token = request.query_params.get("hub.verify_token")
         hub_challenge = request.query_params.get("hub.challenge")
 
         if hub_mode and hub_verify_token:
-            if hub_mode == "subscribe" and hub_verify_token == os.getenv(
-                "WHATSAPP_VERIFY_TOKEN"
+            if (
+                hub_mode == "subscribe"
+                and hub_verify_token == settings.whatsapp_verify_token
             ):
                 logger.info("WEBHOOK_VERIFIED")
-                return int(hub_challenge)
+                return Response(content=hub_challenge)
             raise HTTPException(status_code=403, detail="Forbidden")
         raise HTTPException(status_code=400, detail="Invalid verification request")
     except Exception as e:
@@ -150,12 +141,14 @@ async def webhook(request: Request):
         data = await request.json()
         idempotency_key = request.headers.get("X-FB-Request-Id")
 
-        if idempotency_key and webhook_handler.is_request_processed(idempotency_key):
+        if idempotency_key and app.webhook_handler.is_request_processed(
+            idempotency_key
+        ):
             logger.info(f"Skipping duplicate request {idempotency_key}")
-            return "OK"
+            return Response(status_code=200)
 
         if not data or "entry" not in data:
-            return "OK"
+            return Response(status_code=200)
 
         for entry in data["entry"]:
             if "changes" not in entry:
@@ -167,7 +160,7 @@ async def webhook(request: Request):
                     continue
 
                 for message in value["messages"]:
-                    if not webhook_handler.should_process_message(message):
+                    if not app.webhook_handler.should_process_message(message):
                         continue
 
                     message_id = message["id"]
@@ -175,23 +168,38 @@ async def webhook(request: Request):
                         user_id = message["from"]
                         message_text = message["text"]["body"]
 
-                        # Store user message first
-                        await chat_service.store_message(
-                            user_id, message_text, is_user=True
+                        # Store user message
+                        await app.chat_service.store_message(
+                            user_id=user_id,
+                            content=message_text,
+                            sender=user_id,
+                            message_type="text",
                         )
 
                         # Get AI response
-                        response = await chat_service.send_message_to_openai(
+                        response = await app.chat_service.send_message_to_openai(
                             message_text, user_id
                         )
 
                         if response:
+                            # Store AI response
+                            await app.chat_service.store_message(
+                                user_id=user_id,
+                                content=response,
+                                sender="assistant",
+                                message_type="text",
+                            )
+
                             # Send response back to user
-                            message_data = webhook_handler.create_message_body(
+                            message_data = app.webhook_handler.create_message_body(
                                 user_id, response
                             )
-                            if webhook_handler.send_whatsapp_message(message_data):
-                                webhook_handler.mark_message_processed(
+                            success = await app.webhook_handler.send_whatsapp_message(
+                                message_data
+                            )
+
+                            if success:
+                                app.webhook_handler.mark_message_processed(
                                     message_id, response
                                 )
                             else:
@@ -204,14 +212,14 @@ async def webhook(request: Request):
                             f"Error processing message {message_id}: {str(e)}",
                             exc_info=True,
                         )
-                        webhook_handler.mark_message_processed(message_id)
-                        error_data = webhook_handler.create_message_body(
+                        app.webhook_handler.mark_message_processed(message_id)
+                        error_data = app.webhook_handler.create_message_body(
                             user_id,
                             "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta nuevamente.",
                         )
-                        webhook_handler.send_whatsapp_message(error_data)
+                        await app.webhook_handler.send_whatsapp_message(error_data)
 
-        return "OK"
+        return Response(status_code=200)
 
     except Exception as e:
         logger.error(f"Error in webhook: {str(e)}")
