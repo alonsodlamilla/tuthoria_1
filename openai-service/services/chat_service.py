@@ -8,6 +8,11 @@ from langchain_core.runnables import RunnablePassthrough
 from shared.templates.prompts import SYSTEM_PROMPT
 from services.db_client import DBClient
 from datetime import datetime
+from tiktoken import encoding_for_model
+
+MAX_TOKENS = 6000  # GPT-4's context window is 8k, leave some room for response
+SYSTEM_PROMPT_TOKENS = 200  # Approximate tokens for system prompt
+BUFFER_TOKENS = 1000  # Leave room for the response
 
 
 class ChatService:
@@ -17,6 +22,10 @@ class ChatService:
             # Initialize DB client (only for reading history)
             self.db_client = DBClient()
             logger.debug("DB client initialized successfully")
+
+            # Initialize tokenizer
+            self.tokenizer = encoding_for_model("gpt-4")
+            logger.debug("Tokenizer initialized successfully")
 
             # Initialize the ChatOpenAI model with proper configuration
             self.llm = ChatOpenAI(
@@ -42,6 +51,39 @@ class ChatService:
             logger.error(f"Error initializing ChatService: {str(e)}")
             raise
 
+    def _count_tokens(self, text: str) -> int:
+        """Count tokens in a text string"""
+        return len(self.tokenizer.encode(text))
+
+    def _trim_history_to_fit(
+        self, history: List[BaseMessage], current_message: str
+    ) -> List[BaseMessage]:
+        """Trim history to fit within token limit"""
+        current_tokens = self._count_tokens(current_message)
+        available_tokens = (
+            MAX_TOKENS - SYSTEM_PROMPT_TOKENS - current_tokens - BUFFER_TOKENS
+        )
+
+        if available_tokens <= 0:
+            logger.warning("Message too long, no room for history")
+            return []
+
+        total_tokens = 0
+        trimmed_history = []
+
+        # Process messages from newest to oldest
+        for msg in reversed(history):
+            msg_tokens = self._count_tokens(msg.content)
+            if total_tokens + msg_tokens > available_tokens:
+                break
+            total_tokens += msg_tokens
+            trimmed_history.insert(0, msg)  # Insert at beginning to maintain order
+
+        logger.info(
+            f"Trimmed history from {len(history)} to {len(trimmed_history)} messages"
+        )
+        return trimmed_history
+
     async def process_message(
         self, message: str, user_id: str, history: List[Dict]
     ) -> str:
@@ -55,9 +97,13 @@ class ChatService:
             chat_history = self._format_history(history)
             logger.debug(f"Formatted chat history length: {len(chat_history)}")
 
+            # Trim history to fit token limit
+            trimmed_history = self._trim_history_to_fit(chat_history, message)
+            logger.debug(f"Trimmed history length: {len(trimmed_history)}")
+
             # Create messages for the prompt
             messages = self.prompt.format_messages(
-                chat_history=chat_history, input=message
+                chat_history=trimmed_history, input=message
             )
             logger.debug(f"Formatted messages for LLM")
 
