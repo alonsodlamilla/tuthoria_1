@@ -8,11 +8,10 @@ from langchain_core.runnables import RunnablePassthrough
 from shared.templates.prompts import SYSTEM_PROMPT
 from services.db_client import DBClient
 from datetime import datetime
-from tiktoken import encoding_for_model
 
-MAX_TOKENS = 6000  # GPT-4's context window is 8k, leave some room for response
-SYSTEM_PROMPT_TOKENS = 200  # Approximate tokens for system prompt
-BUFFER_TOKENS = 1000  # Leave room for the response
+MAX_CHARS = 12000  # Approximate character limit for context window
+SYSTEM_PROMPT_CHARS = 400  # Approximate chars for system prompt
+BUFFER_CHARS = 2000  # Leave room for the response
 
 
 class ChatService:
@@ -22,10 +21,6 @@ class ChatService:
             # Initialize DB client (only for reading history)
             self.db_client = DBClient()
             logger.debug("DB client initialized successfully")
-
-            # Initialize tokenizer
-            self.tokenizer = encoding_for_model("gpt-4")
-            logger.debug("Tokenizer initialized successfully")
 
             # Initialize the ChatOpenAI model with proper configuration
             self.llm = ChatOpenAI(
@@ -51,32 +46,30 @@ class ChatService:
             logger.error(f"Error initializing ChatService: {str(e)}")
             raise
 
-    def _count_tokens(self, text: str) -> int:
-        """Count tokens in a text string"""
-        return len(self.tokenizer.encode(text))
+    def _count_chars(self, text: str) -> int:
+        """Count characters in a text string"""
+        return len(text)
 
     def _trim_history_to_fit(
         self, history: List[BaseMessage], current_message: str
     ) -> List[BaseMessage]:
-        """Trim history to fit within token limit"""
-        current_tokens = self._count_tokens(current_message)
-        available_tokens = (
-            MAX_TOKENS - SYSTEM_PROMPT_TOKENS - current_tokens - BUFFER_TOKENS
-        )
+        """Trim history to fit within character limit"""
+        current_chars = self._count_chars(current_message)
+        available_chars = MAX_CHARS - SYSTEM_PROMPT_CHARS - current_chars - BUFFER_CHARS
 
-        if available_tokens <= 0:
+        if available_chars <= 0:
             logger.warning("Message too long, no room for history")
             return []
 
-        total_tokens = 0
+        total_chars = 0
         trimmed_history = []
 
         # Process messages from newest to oldest
         for msg in reversed(history):
-            msg_tokens = self._count_tokens(msg.content)
-            if total_tokens + msg_tokens > available_tokens:
+            msg_chars = self._count_chars(msg.content)
+            if total_chars + msg_chars > available_chars:
                 break
-            total_tokens += msg_tokens
+            total_chars += msg_chars
             trimmed_history.insert(0, msg)  # Insert at beginning to maintain order
 
         logger.info(
@@ -97,7 +90,7 @@ class ChatService:
             chat_history = self._format_history(history)
             logger.debug(f"Formatted chat history length: {len(chat_history)}")
 
-            # Trim history to fit token limit
+            # Trim history to fit character limit
             trimmed_history = self._trim_history_to_fit(chat_history, message)
             logger.debug(f"Trimmed history length: {len(trimmed_history)}")
 
