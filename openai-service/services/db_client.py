@@ -45,6 +45,20 @@ class DBClient:
     @retry(
         stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
     )
+    async def _store_message_with_retry(
+        self,
+        url: str,
+        payload: dict,
+    ) -> bool:
+        """Internal method to store message with retries"""
+        response = await self.client.post(
+            url,
+            json=payload,
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        return True
+
     async def store_message(
         self,
         user_id: str,
@@ -69,16 +83,10 @@ class DBClient:
             logger.debug(f"Making POST request to: {url}")
             logger.debug(f"Request payload: {payload}")
 
-            response = await self.client.post(
-                url,
-                json=payload,
-                timeout=10.0,
-            )
-            response.raise_for_status()
+            success = await self._store_message_with_retry(url, payload)
 
             logger.info(f"Successfully stored message for user {user_id}")
-            logger.debug(f"Response status code: {response.status_code}")
-            return True
+            return success
 
         except Exception as e:
             logger.error(
@@ -92,4 +100,7 @@ class DBClient:
     async def close(self):
         """Close the HTTP client"""
         logger.info("Closing DB client")
-        await self.client.aclose()
+        try:
+            await self.client.aclose()
+        except Exception as e:
+            logger.error(f"Error closing DB client: {str(e)}", exc_info=True)
