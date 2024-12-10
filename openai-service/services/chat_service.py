@@ -118,9 +118,7 @@ class ChatService:
         try:
             chat_history = []
             # Sort messages by timestamp to ensure chronological order
-            sorted_history = sorted(
-                history, key=lambda x: x.get("timestamp", datetime.min)
-            )
+            sorted_history = sorted(history, key=lambda x: x["timestamp"])
 
             for msg in sorted_history:
                 if not msg.get("content"):
