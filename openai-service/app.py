@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from shared.templates.prompts import TEMPLATES
 from services.db_client import DBClient
@@ -27,7 +28,10 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down OpenAI service")
-    await db_client.close()
+    if hasattr(app, "db_client"):
+        await app.db_client.close()
+    if hasattr(app, "chat_service"):
+        await app.chat_service.close()
 
 
 app = FastAPI(
@@ -41,7 +45,7 @@ settings = get_settings()
 logger.remove()  # Remove default handler
 logger.add(
     sys.stdout,
-    level="DEBUG",  # Set this to INFO in production
+    level="DEBUG" if settings.DEBUG else "INFO",
     format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
 )
 logger.add(
@@ -63,8 +67,8 @@ app.add_middleware(
 
 # Initialize clients
 logger.info("Initializing service clients")
-db_client = DBClient()
-chat_service = ChatService()
+app.db_client = DBClient()
+app.chat_service = ChatService()
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -80,18 +84,30 @@ async def chat_endpoint(message: Message):
     try:
         # Get conversation history
         logger.debug("Fetching conversation history")
-        history = await db_client.get_conversation_history(message.user_id)
+        history = await app.db_client.get_conversation_history(message.user_id)
 
         # Process with LangChain
         logger.debug("Processing message with LangChain")
-        response = await chat_service.process_message(
+        response = await app.chat_service.process_message(
             message.content, message.user_id, history
         )
 
         # Store both user message and response
         logger.debug("Storing conversation in DB")
-        await db_client.store_message(message.user_id, message.content, is_user=True)
-        await db_client.store_message(message.user_id, response, is_user=False)
+        await app.db_client.store_message(
+            user_id=message.user_id,
+            content=message.content,
+            sender=message.user_id,
+            message_type=message.message_type,
+            timestamp=message.timestamp,
+        )
+        await app.db_client.store_message(
+            user_id=message.user_id,
+            content=response,
+            sender="assistant",
+            message_type="text",
+            timestamp=datetime.utcnow(),
+        )
 
         logger.info(f"Successfully processed message for user {message.user_id}")
         return ChatResponse(response=response)
@@ -106,7 +122,7 @@ async def get_conversation(user_id: str, limit: int = 10):
     """Get conversation history for a user"""
     logger.info(f"Fetching conversation history for user {user_id}")
     try:
-        messages = await db_client.get_conversation_history(user_id, limit)
+        messages = await app.db_client.get_conversation_history(user_id, limit)
         logger.debug(f"Retrieved {len(messages)} messages for user {user_id}")
         return ConversationHistory(messages=messages, user_id=user_id)
     except Exception as e:

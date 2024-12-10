@@ -5,19 +5,31 @@ from datetime import datetime
 
 class Message(BaseModel):
     """Single message in a conversation"""
+
     content: str
     user_id: str
-    context: Optional[Dict[str, str]] = Field(default_factory=dict)
+    message_type: str = "text"
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ChatResponse(BaseModel):
     """Response from chat endpoint"""
+
     response: str
-    conversation_id: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ConversationMessage(BaseModel):
+    """Message in conversation history"""
+
+    content: str
+    sender: str
+    message_type: str = "text"
+    timestamp: datetime
 
 
 class ConversationHistory(BaseModel):
     """Conversation history"""
-    messages: List[Dict[str, str]]
-    user_id: str 
+
+    messages: List[ConversationMessage]
+    user_id: str
