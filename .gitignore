@@ -16,3 +16,7 @@ credentials/
 *.json
 logs/
 *.log
+.coverage
+htmlcov/
+coverage.xml
+.pytest_cache/
