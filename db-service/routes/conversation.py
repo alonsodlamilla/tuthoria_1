@@ -34,6 +34,7 @@ async def add_message(message: ConversationMessage):
             logger.info(f"Creating new conversation for user: {message.user_id}")
             # Create new conversation with default title and participants
             new_conversation = Conversation(
+                _id=ObjectId(),
                 user_id=message.user_id,
                 title=f"Chat with {message.user_id}",
                 participants=[message.user_id],
