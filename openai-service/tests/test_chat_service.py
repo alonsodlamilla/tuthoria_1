@@ -18,9 +18,7 @@ mock_langchain = {
 }
 
 # Constants (copied from chat_service to avoid import issues)
-MAX_TOKENS = 6000
-SYSTEM_PROMPT_TOKENS = 200
-BUFFER_TOKENS = 1000
+MAX_CHARS = 12000
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +43,6 @@ def chat_service(mock_db_client):
 
         service = ChatService()
         # Mock internal methods and dependencies
-        service._count_tokens = Mock(side_effect=lambda x: len(x))  # 1 token per char
         service.llm = MagicMock()
         service.llm.ainvoke = AsyncMock(return_value=MagicMock(content="Test response"))
         yield service
@@ -71,14 +68,6 @@ async def test_init_failure():
 
 
 @pytest.mark.asyncio
-async def test_count_tokens(chat_service):
-    """Test token counting"""
-    text = "Hello, world!"
-    token_count = chat_service._count_tokens(text)
-    assert token_count == len(text)  # Our mock returns 1 token per char
-
-
-@pytest.mark.asyncio
 async def test_trim_history_empty(chat_service):
     """Test history trimming with empty history"""
     history = []
@@ -90,7 +79,7 @@ async def test_trim_history_empty(chat_service):
 async def test_trim_history_message_too_long(chat_service):
     """Test history trimming when message is too long"""
     history = [MagicMock(content="test")]
-    long_message = "x" * (MAX_TOKENS + 1)  # Exceeds max tokens
+    long_message = "x" * (MAX_CHARS + 1)  # Exceeds max chars
     trimmed = chat_service._trim_history_to_fit(history, long_message)
     assert trimmed == []
 
@@ -98,17 +87,16 @@ async def test_trim_history_message_too_long(chat_service):
 @pytest.mark.asyncio
 async def test_trim_history_partial(chat_service):
     """Test history trimming with partial history retention"""
-    # Create messages that will exceed token limit
     messages = []
-    for i in range(10):  # Create enough messages to exceed token limit
+    for i in range(10):
         msg = MagicMock()
-        msg.content = "x" * 1000  # Each message is 1000 tokens
+        msg.content = "x" * 1000
         messages.append(msg)
 
-    trimmed = chat_service._trim_history_to_fit(messages, "new message")
-    assert len(trimmed) < len(messages)
-    # Check the most recent message is retained
-    assert trimmed[-1].content == messages[-1].content
+    result = await chat_service._trim_history_to_fit(messages, "new message")
+    assert len(result) < len(messages)
+    assert isinstance(result, list)
+    assert result[-1].content == "x" * 1000
 
 
 @pytest.mark.asyncio
@@ -160,8 +148,9 @@ async def test_format_history_valid(chat_service):
     ):
         formatted = chat_service._format_history(history)
         assert len(formatted) == 2
-        assert formatted[0].content == "Hello"
-        assert formatted[1].content == "Hi there"
+        msg1, msg2 = formatted
+        assert msg1.content == "Hello"
+        assert msg2.content == "Hi there"
 
 
 @pytest.mark.asyncio
