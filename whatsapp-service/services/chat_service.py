@@ -1,9 +1,10 @@
 import logging
-from typing import Dict
+from typing import Dict, Optional
 from config import get_settings
-import requests
+import httpx
 from loguru import logger
 from datetime import datetime
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 class ChatService:
@@ -11,6 +12,7 @@ class ChatService:
         self.settings = get_settings()
         self.openai_service_url = self.settings.build_service_url("openai")
         self.db_service_url = self.settings.build_service_url("db")
+        self.client = httpx.AsyncClient(timeout=60.0)
 
     async def send_message_to_openai(self, message: str, user_id: str) -> str:
         """Send message to OpenAI service and get response"""
@@ -24,49 +26,61 @@ class ChatService:
             }
 
             logger.debug(f"Request payload to OpenAI service: {payload}")
-            response = requests.post(
+            response = await self.client.post(
                 f"{self.openai_service_url}/chat",
                 json=payload,
-                timeout=60.0,  # Increased timeout
             )
+            response.raise_for_status()
 
-            if response.status_code == 200:
-                ai_response = response.json()["response"]
-                logger.info("OpenAI response received for %s", user_id)
-                return ai_response
-            else:
-                logger.error(f"Error from OpenAI service: {response.text}")
-                logger.error(f"Status code: {response.status_code}")
-                return "Lo siento, hubo un error al procesar tu mensaje."
+            data = response.json()
+            ai_response = data["response"]
+            logger.info("OpenAI response received for %s", user_id)
+            return ai_response
 
-        except requests.Timeout:
+        except httpx.TimeoutException:
             logger.error("Timeout while waiting for OpenAI response")
             return "Lo siento, el servicio está tardando demasiado. Por favor, intenta nuevamente."
         except Exception as e:
             logger.error(f"Error in send_message_to_openai: {str(e)}", exc_info=True)
             return "Lo siento, hubo un error. ¿Podemos intentar nuevamente?"
 
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def store_message(
-        self, user_id: str, message: str, is_user: bool = True
-    ) -> None:
-        """Store message in DB service"""
+        self,
+        user_id: str,
+        content: str,
+        sender: str,
+        message_type: str = "text",
+        timestamp: Optional[datetime] = None,
+    ) -> bool:
+        """Store message in DB service with retries"""
         try:
             payload = {
                 "user_id": user_id,
-                "content": message,
-                "sender": user_id if is_user else "assistant",
-                "message_type": "text",
-                "timestamp": datetime.utcnow().isoformat(),
+                "content": content,
+                "sender": sender,
+                "message_type": message_type,
+                "timestamp": (timestamp or datetime.utcnow()).isoformat(),
             }
 
             logger.debug(f"Storing message with payload: {payload}")
-            response = requests.post(
+            response = await self.client.post(
                 f"{self.db_service_url}/api/v1/conversations/messages",
                 json=payload,
                 timeout=10.0,
             )
             response.raise_for_status()
+
             logger.info(f"Message stored successfully for user {user_id}")
+            return True
+
         except Exception as e:
             logger.error(f"Error storing message: {str(e)}", exc_info=True)
+            logger.error(f"Failed payload: {payload}")
             raise
+
+    async def close(self):
+        """Close the HTTP client"""
+        await self.client.aclose()
