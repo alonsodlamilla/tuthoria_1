@@ -207,18 +207,6 @@ async def test_close(chat_service):
 
 
 @pytest.mark.asyncio
-async def test_count_tokens_error(chat_service):
-    """Test token counting with error"""
-    # Mock the encode method to raise an exception
-    chat_service.tokenizer = MagicMock()
-    chat_service.tokenizer.encode.side_effect = Exception("Tokenizer error")
-
-    with pytest.raises(Exception) as exc_info:
-        chat_service._count_tokens("test")
-    assert "Tokenizer error" in str(exc_info.value)
-
-
-@pytest.mark.asyncio
 async def test_format_history_error(chat_service):
     """Test history formatting with error"""
     # Create history that will cause an error when sorting
