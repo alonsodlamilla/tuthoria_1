@@ -34,7 +34,6 @@ async def add_message(message: ConversationMessage):
             logger.info(f"Creating new conversation for user: {message.user_id}")
             # Create new conversation with default title and participants
             new_conversation = Conversation(
-                _id=ObjectId(),
                 user_id=message.user_id,
                 title=f"Chat with {message.user_id}",
                 participants=[message.user_id],
@@ -56,45 +55,53 @@ async def add_message(message: ConversationMessage):
                 logger.info(f"Created new conversation with ID: {result.inserted_id}")
                 return {"status": "success", "message": "Message stored successfully"}
             except Exception as e:
-                logger.error(f"Error creating conversation: {str(e)}")
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to create conversation: {str(e)}"
-                )
-        else:
-            # Conversation exists, update it with the new message
-            try:
-                if "_id" not in conversation:
-                    logger.error("Conversation found but missing _id field")
+                if "duplicate key error" in str(e):
+                    # Race condition: conversation was created between our check and insert
+                    # Retry the operation by getting the conversation again
+                    logger.warning("Conversation already exists, retrying as update")
+                    conversation = await db.conversations.find_one(
+                        {"user_id": message.user_id}
+                    )
+                    if not conversation:
+                        logger.error(
+                            "Failed to find conversation after duplicate key error"
+                        )
+                        raise HTTPException(
+                            status_code=500, detail="Failed to handle message"
+                        )
+                else:
+                    logger.error(f"Error creating conversation: {str(e)}")
                     raise HTTPException(
-                        status_code=500, detail="Invalid conversation data"
+                        status_code=500,
+                        detail=f"Failed to create conversation: {str(e)}",
                     )
 
-                conversation_id = conversation["_id"]
-                logger.info(f"Updating existing conversation: {conversation_id}")
+        # At this point we either have an existing conversation or need to update after a race condition
+        try:
+            conversation_id = conversation["_id"]
+            logger.info(f"Updating existing conversation: {conversation_id}")
 
-                # Update conversation with new message
-                update_result = await db.conversations.update_one(
-                    {"_id": conversation_id},
-                    {
-                        "$push": {"messages": new_message.model_dump()},
-                        "$set": {"updated_at": datetime.utcnow()},
-                    },
-                )
+            # Update conversation with new message
+            update_result = await db.conversations.update_one(
+                {"_id": conversation_id},
+                {
+                    "$push": {"messages": new_message.model_dump()},
+                    "$set": {"updated_at": datetime.utcnow()},
+                },
+            )
 
-                if update_result.modified_count == 0:
-                    logger.error(f"Failed to update conversation: {conversation_id}")
-                    raise HTTPException(
-                        status_code=500, detail="Failed to store message"
-                    )
+            if update_result.modified_count == 0:
+                logger.error(f"Failed to update conversation: {conversation_id}")
+                raise HTTPException(status_code=500, detail="Failed to store message")
 
-                logger.info(f"Successfully stored message for user: {message.user_id}")
-                return {"status": "success", "message": "Message stored successfully"}
+            logger.info(f"Successfully stored message for user: {message.user_id}")
+            return {"status": "success", "message": "Message stored successfully"}
 
-            except Exception as e:
-                logger.error(f"Error updating conversation: {str(e)}")
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to update conversation: {str(e)}"
-                )
+        except Exception as e:
+            logger.error(f"Error updating conversation: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to update conversation: {str(e)}"
+            )
 
     except Exception as e:
         logger.error(f"Error processing message: {str(e)}")

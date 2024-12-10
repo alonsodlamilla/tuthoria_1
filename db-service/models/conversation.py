@@ -53,7 +53,7 @@ class ConversationBase(BaseModel):
 
 
 class Conversation(ConversationBase):
-    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    id: PyObjectId = Field(default_factory=ObjectId, alias="_id")
     messages: List[Message] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
