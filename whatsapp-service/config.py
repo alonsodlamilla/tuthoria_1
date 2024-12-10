@@ -53,10 +53,13 @@ class Settings(BaseSettings):
         else:
             raise ValueError(f"Unknown service: {service}")
 
-        # In production (Railway), we don't include the port in the URL
+        # In production (Railway), we use a different format but keep the port
         if self.environment == "production":
-            # For HTTPS, we don't need to specify port 443 as it's the default
-            return f"{protocol}://{domain}{path}"
+            # For HTTPS with default port 443, we don't include the port
+            if protocol == "https" and port == 443:
+                return f"{protocol}://{domain}{path}"
+            # For all other cases, include the port
+            return f"{protocol}://{domain}:{port}{path}"
 
         # In development, we use the specified ports
         if protocol == "https" and port == 443:
