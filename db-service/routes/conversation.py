@@ -109,7 +109,7 @@ async def add_message(message: ConversationMessage):
 
 
 @router.get("/conversations/{user_id}")
-async def get_conversation_history(user_id: str, limit: int = 10):
+async def get_conversation_history(user_id: str, limit: int = 50):
     """Get conversation history for a user with proper message formatting"""
     try:
         logger.info(f"Fetching conversation history for user: {user_id}")
@@ -122,7 +122,11 @@ async def get_conversation_history(user_id: str, limit: int = 10):
             return {"messages": []}
 
         # Get messages and validate/format them
-        raw_messages = conversation.get("messages", [])[-limit:]
+        raw_messages = conversation.get("messages", [])
+        # Sort messages by timestamp to ensure chronological order
+        raw_messages.sort(key=lambda x: x.get("timestamp", datetime.min))
+        # Take the most recent messages up to the limit
+        raw_messages = raw_messages[-limit:]
         formatted_messages = []
 
         for msg in raw_messages:

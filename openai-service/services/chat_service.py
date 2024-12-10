@@ -7,6 +7,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.runnables import RunnablePassthrough
 from shared.templates.prompts import SYSTEM_PROMPT
 from services.db_client import DBClient
+from datetime import datetime
 
 
 class ChatService:
@@ -77,15 +78,28 @@ class ChatService:
         logger.debug(f"Formatting history of length: {len(history)}")
         try:
             chat_history = []
-            for msg in history:
-                if msg.get("content") and msg.get("sender") == "user":
-                    chat_history.append(HumanMessage(content=msg["content"]))
-                    logger.trace(f"Added human message: {msg['content'][:50]}...")
-                elif msg.get("content") and msg.get("sender") == "assistant":
-                    chat_history.append(AIMessage(content=msg["content"]))
-                    logger.trace(f"Added AI message: {msg['content'][:50]}...")
+            # Sort messages by timestamp to ensure chronological order
+            sorted_history = sorted(
+                history, key=lambda x: x.get("timestamp", datetime.min)
+            )
 
-            logger.debug(f"Successfully formatted {len(chat_history)} messages")
+            for msg in sorted_history:
+                if not msg.get("content"):
+                    logger.warning("Skipping message without content")
+                    continue
+
+                if msg.get("sender") == "user":
+                    chat_history.append(HumanMessage(content=msg["content"]))
+                    logger.debug(f"Added human message: {msg['content'][:50]}...")
+                elif msg.get("sender") == "assistant":
+                    chat_history.append(AIMessage(content=msg["content"]))
+                    logger.debug(f"Added AI message: {msg['content'][:50]}...")
+                else:
+                    logger.warning(f"Unknown sender type: {msg.get('sender')}")
+
+            logger.info(
+                f"Successfully formatted {len(chat_history)} messages from {len(history)} total"
+            )
             return chat_history
 
         except Exception as e:
