@@ -6,12 +6,17 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables import RunnablePassthrough
 from shared.templates.prompts import SYSTEM_PROMPT
+from services.db_client import DBClient
 
 
 class ChatService:
     def __init__(self):
         logger.info("Initializing ChatService")
         try:
+            # Initialize DB client
+            self.db_client = DBClient()
+            logger.debug("DB client initialized successfully")
+
             # Initialize the ChatOpenAI model with proper configuration
             self.llm = ChatOpenAI(
                 model_name="gpt-4",
@@ -63,7 +68,10 @@ class ChatService:
             # Store the response in DB
             try:
                 await self.db_client.store_message(
-                    user_id=user_id, content=response.content, is_user=False
+                    user_id=user_id,
+                    content=response.content,
+                    sender="assistant",
+                    message_type="text",
                 )
             except Exception as e:
                 logger.error(f"Failed to store AI response: {str(e)}")
@@ -81,12 +89,12 @@ class ChatService:
         try:
             chat_history = []
             for msg in history:
-                if msg.get("message"):
-                    chat_history.append(HumanMessage(content=msg["message"]))
-                    logger.trace(f"Added human message: {msg['message'][:50]}...")
-                if msg.get("response"):
-                    chat_history.append(AIMessage(content=msg["response"]))
-                    logger.trace(f"Added AI message: {msg['response'][:50]}...")
+                if msg.get("content") and msg.get("sender") == "user":
+                    chat_history.append(HumanMessage(content=msg["content"]))
+                    logger.trace(f"Added human message: {msg['content'][:50]}...")
+                elif msg.get("content") and msg.get("sender") == "assistant":
+                    chat_history.append(AIMessage(content=msg["content"]))
+                    logger.trace(f"Added AI message: {msg['content'][:50]}...")
 
             logger.debug(f"Successfully formatted {len(chat_history)} messages")
             return chat_history
