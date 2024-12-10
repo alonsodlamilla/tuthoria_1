@@ -16,23 +16,47 @@ El sistema está compuesto por tres microservicios:
    - Procesa los mensajes usando LangChain
    - Mantiene el contexto de la conversación
    - Genera respuestas con IA
+   - Endpoint de salud: `/health`
 
 3. DB Service (Puerto 8000)
    - Almacena el historial de conversaciones
    - Gestiona la persistencia de mensajes
    - Proporciona recuperación de conversaciones
+   - Endpoint de salud: `/health`
 
 ### Flujo de Mensajes
 ```mermaid
 sequenceDiagram
-    WhatsApp Service->>DB Service: Almacena mensaje entrante
-    WhatsApp Service->>OpenAI Service: Procesa mensaje
-    OpenAI Service->>DB Service: Obtiene historial
-    OpenAI Service->>OpenAI Service: Procesa con IA
-    OpenAI Service->>DB Service: Almacena respuesta
-    OpenAI Service->>WhatsApp Service: Retorna respuesta
-    WhatsApp Service->>Usuario: Envía mensaje
+    participant U as Usuario
+    participant W as WhatsApp Service
+    participant O as OpenAI Service
+    participant D as DB Service
+    
+    U->>W: Envía mensaje
+    W->>D: Almacena mensaje (user)
+    W->>O: Solicita procesamiento
+    O->>D: Obtiene historial
+    O->>O: Procesa con IA
+    O-->>W: Retorna respuesta
+    W->>D: Almacena respuesta (assistant)
+    W->>U: Envía respuesta
 ```
+
+### Formato de Mensajes
+
+Los mensajes siguen un formato estándar en todo el sistema:
+
+```json
+{
+    "user_id": "string",      # ID del usuario (número de WhatsApp)
+    "content": "string",      # Contenido del mensaje
+    "sender": "string",       # "user_id" o "assistant"
+    "message_type": "text",   # Tipo de mensaje
+    "timestamp": "ISO-8601"   # Marca de tiempo
+}
+```
+
+Para más detalles técnicos, consulte [TECHNICAL.md](TECHNICAL.md).
 
 ## Estructura del Proyecto
 
@@ -115,59 +139,20 @@ docker compose up --build
 docker compose -f compose.yml -f compose.override.yml up
 ```
 
-## Despliegue en Railway
-
-El proyecto está configurado para despliegue en Railway usando múltiples servicios:
-
-1. Configuración de Servicios:
-   - Cada servicio tiene su propio `railway.toml` y `Dockerfile`
-   - Modo producción optimizado
-   - Health checks configurados
-
-2. Conexión entre Servicios:
-   - Servicios se comunican a través de URLs internas de Railway
-   - Formato: `https://{service-name}.railway.internal`
-
-3. Pasos de Despliegue:
-```bash
-# Instalar CLI de Railway
-npm i -g @railway/cli
-
-# Autenticarse
-railway login
-
-# Vincular al proyecto existente
-railway link
-
-# Verificar estado
-railway status
-```
-
-4. Variables de Entorno en Railway:
-   - Configurar las variables de entorno para cada servicio
-   - Actualizar URLs de servicios al formato `.railway.internal`
-
 ## Monitoreo y Salud
 
 - Cada servicio expone un endpoint `/health`
 - Railway monitorea la salud automáticamente
 - Logs disponibles en el dashboard de Railway
 
-## Optimización de Construcción
+## Contribución
 
-El servicio de OpenAI utiliza una construcción Docker multi-etapa:
+1. Fork el repositorio
+2. Crea una rama para tu feature (`git checkout -b feature/amazing-feature`)
+3. Commit tus cambios (`git commit -m 'feat: add amazing feature'`)
+4. Push a la rama (`git push origin feature/amazing-feature`)
+5. Abre un Pull Request
 
-- Construcción multi-etapa para separar dependencias
-- Caché de wheels para paquetes Python
-- Imagen base mínima (python:3.10-slim)
-- Separación de dependencias de desarrollo
+## Licencia
 
-Para construir en desarrollo:
-```bash
-docker build -t openai-service:dev .
-```
-
-Para producción con imagen mínima:
-```bash
-docker build --target production -t openai-service:prod .
-```
+Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
