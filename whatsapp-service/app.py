@@ -27,6 +27,10 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     logger.info("Starting WhatsApp service")
 
+    # Agregar estos logs de debug
+    logger.debug(f"DB Service URL: {settings.build_service_url('db', '/health')}")
+    logger.debug(f"OpenAI Service URL: {settings.build_service_url('openai', '/health')}")
+
     # Check services health on startup
     services = [("db", "/health"), ("openai", "/health")]
 
