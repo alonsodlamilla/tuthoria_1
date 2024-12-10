@@ -46,20 +46,25 @@ class DBClient:
         stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
     )
     async def store_message(
-        self, user_id: str, content: str, is_user: bool = True
+        self,
+        user_id: str,
+        content: str,
+        sender: str,
+        message_type: str = "text",
+        timestamp: Optional[datetime] = None,
     ) -> bool:
         """Store message with retries"""
         logger.info(f"Storing message for user {user_id}")
-        logger.debug(f"Message type: {'user' if is_user else 'assistant'}")
+        logger.debug(f"Message type: {message_type}, Sender: {sender}")
 
         try:
             url = f"{self.base_url}/conversations/messages"
             payload = {
                 "user_id": user_id,
                 "content": content,
-                "sender": user_id if is_user else "assistant",
-                "message_type": "text",
-                "timestamp": datetime.utcnow().isoformat(),
+                "sender": sender,
+                "message_type": message_type,
+                "timestamp": (timestamp or datetime.utcnow()).isoformat(),
             }
             logger.debug(f"Making POST request to: {url}")
             logger.debug(f"Request payload: {payload}")
@@ -81,7 +86,7 @@ class DBClient:
             )
             logger.error(f"User ID: {user_id}")
             logger.error(f"Content length: {len(content)}")
-            logger.error(f"Is user message: {is_user}")
+            logger.error(f"Sender: {sender}")
             return False
 
     async def close(self):

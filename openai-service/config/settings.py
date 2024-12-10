@@ -25,12 +25,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
-        env_file_encoding='utf-8',
-        extra='ignore'  # Ignore extra env vars
+        env_file_encoding="utf-8",
+        extra="ignore",  # Ignore extra env vars
     )
 
 
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    return Settings() 
+    return Settings()
