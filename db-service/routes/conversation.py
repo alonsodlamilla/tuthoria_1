@@ -4,6 +4,7 @@ from database import get_database
 from datetime import datetime
 from bson import ObjectId
 from loguru import logger
+from typing import List, Dict
 
 
 router = APIRouter()
@@ -101,18 +102,39 @@ async def add_message(message: ConversationMessage):
 
 @router.get("/conversations/{user_id}")
 async def get_conversation_history(user_id: str, limit: int = 10):
+    """Get conversation history for a user with proper message formatting"""
     try:
         logger.info(f"Fetching conversation history for user: {user_id}")
         db = await get_database()
 
+        # Find conversation
         conversation = await db.conversations.find_one({"user_id": user_id})
         if not conversation:
             logger.info(f"No conversation found for user: {user_id}")
             return {"messages": []}
 
-        messages = conversation.get("messages", [])[-limit:]
-        logger.info(f"Retrieved {len(messages)} messages for user: {user_id}")
-        return {"messages": messages}
+        # Get messages and validate/format them
+        raw_messages = conversation.get("messages", [])[-limit:]
+        formatted_messages = []
+
+        for msg in raw_messages:
+            try:
+                # Ensure message has all required fields
+                message = Message(
+                    content=msg["content"],
+                    sender=msg["sender"],
+                    timestamp=msg["timestamp"],
+                    message_type=msg.get("message_type", "text"),
+                )
+                formatted_messages.append(message.model_dump())
+            except Exception as e:
+                logger.warning(f"Skipping invalid message: {str(e)}")
+                continue
+
+        logger.info(
+            f"Retrieved and formatted {len(formatted_messages)} messages for user: {user_id}"
+        )
+        return {"messages": formatted_messages}
 
     except Exception as e:
         logger.error(f"Error fetching conversation history: {str(e)}")
