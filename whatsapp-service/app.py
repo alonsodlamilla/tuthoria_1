@@ -96,7 +96,10 @@ async def chat(request: ChatRequest):
 
         # Store user message
         await app.chat_service.store_message(
-            user_id=user_id, content=message, sender=user_id, message_type=message_type
+            user_id=user_id,
+            content=message,
+            sender="user",
+            message_type=message_type
         )
 
         # Get response from OpenAI
@@ -176,7 +179,7 @@ async def webhook(request: Request):
                         await app.chat_service.store_message(
                             user_id=user_id,
                             content=message_text,
-                            sender=user_id,
+                            sender="user",
                             message_type="text",
                         )
 
