@@ -22,4 +22,4 @@ CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8501} --reload"]
 FROM builder as production
 COPY . .
 ENV PYTHONPATH=/app
-CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-8501} --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout 120 --log-level info --access-logfile - --error-logfile -"]
+CMD ["sh", "-c", "gunicorn app:app --bind [::]:${PORT:-8501} --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout 120 --log-level info --access-logfile - --error-logfile -"]
