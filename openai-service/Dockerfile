@@ -52,4 +52,4 @@ COPY . .
 ENV PYTHONPATH=/app
 
 # Use production server with IPv6 support
-CMD ["sh", "-c", "gunicorn app:app --bind [::]:${PORT:-8502} --workers 2 --worker-class uvicorn.workers.UvicornWorker --timeout 120 --log-level info --access-logfile - --error-logfile -"]
+CMD ["sh", "-c", "gunicorn app:app --bind [::]:${PORT:-8502} --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout 120 --log-level info --access-logfile - --error-logfile -"]
