@@ -34,5 +34,5 @@ ENV PYTHONPATH=/app
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Initialize database and start service with gunicorn
-CMD ["gunicorn", "app:app", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+# Initialize database and start service with gunicorn and IPv6 support
+CMD ["sh", "-c", "python scripts/db_init.py && gunicorn app:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind [::]:8000"]

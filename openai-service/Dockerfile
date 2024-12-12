@@ -51,5 +51,5 @@ COPY . .
 # Add the project root to PYTHONPATH
 ENV PYTHONPATH=/app
 
-# Use production server
-CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-8502} --workers 2 --worker-class uvicorn.workers.UvicornWorker --timeout 120 --log-level info --access-logfile - --error-logfile -"]
+# Use production server with IPv6 support
+CMD ["sh", "-c", "gunicorn app:app --bind [::]:${PORT:-8502} --workers 2 --worker-class uvicorn.workers.UvicornWorker --timeout 120 --log-level info --access-logfile - --error-logfile -"]
