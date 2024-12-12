@@ -97,7 +97,7 @@ async def chat_endpoint(message: Message):
         await app.db_client.store_message(
             user_id=message.user_id,
             content=message.content,
-            sender=message.user_id,
+            sender="user",
             message_type=message.message_type,
             timestamp=message.timestamp,
         )
