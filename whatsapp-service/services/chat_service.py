@@ -12,7 +12,10 @@ class ChatService:
         self.settings = get_settings()
         self.openai_service_url = self.settings.build_service_url("openai")
         self.db_service_url = self.settings.build_service_url("db")
-        self.client = httpx.AsyncClient(timeout=60.0)
+        self.client = httpx.AsyncClient(
+            timeout=60.0,
+            transport=httpx.AsyncHTTPTransport(local_address="::")
+        )
 
     async def send_message_to_openai(self, message: str, user_id: str) -> str:
         """Send message to OpenAI service and get response"""
