@@ -118,7 +118,7 @@ async def chat_endpoint(message: Message):
 
 
 @app.get("/conversations/{user_id}", response_model=ConversationHistory)
-async def get_conversation(user_id: str, limit: int = 10):
+async def get_conversation(user_id: str, limit: int = 20):
     """Get conversation history for a user"""
     logger.info(f"Fetching conversation history for user {user_id}")
     try:
