@@ -8,10 +8,37 @@ from langchain_core.runnables import RunnablePassthrough
 from shared.templates.prompts import SYSTEM_PROMPT
 from services.db_client import DBClient
 from datetime import datetime
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from openai import RateLimitError, APIError, APITimeoutError
+import asyncio
+from fastapi import HTTPException
 
 MAX_CHARS = 12000  # Approximate character limit for context window
 SYSTEM_PROMPT_CHARS = 400  # Approximate chars for system prompt
 BUFFER_CHARS = 2000  # Leave room for the response
+
+
+class RateLimiter:
+    def __init__(self, max_requests: int, time_window: float):
+        self.max_requests = max_requests
+        self.time_window = time_window
+        self.requests = []
+        self._lock = asyncio.Lock()
+
+    async def acquire(self):
+        async with self._lock:
+            now = asyncio.get_event_loop().time()
+            
+            # Remove old requests
+            self.requests = [req_time for req_time in self.requests 
+                        if now - req_time < self.time_window]
+
+            if len(self.requests) >= self.max_requests:
+                sleep_time = self.requests[0] + self.time_window - now
+                if sleep_time > 0:
+                    await asyncio.sleep(sleep_time)
+                    
+            self.requests.append(now)
 
 
 class ChatService:
@@ -22,6 +49,10 @@ class ChatService:
             self.db_client = DBClient()
             logger.debug("DB client initialized successfully")
 
+            # Initialize rate limiter for OpenAI requests
+            self.rate_limiter = RateLimiter(max_requests=30, time_window=60.0)
+            logger.debug("Rate limiter initialized successfully")
+
             # Initialize the ChatOpenAI model with proper configuration
             self.llm = ChatOpenAI(
                 model_name="gpt-4",
@@ -29,6 +60,7 @@ class ChatService:
                 max_tokens=1000,
                 api_key=os.getenv("OPENAI_API_KEY"),
                 streaming=True,
+                request_timeout=30.0,
             )
             logger.debug("ChatOpenAI model initialized successfully")
 
@@ -77,6 +109,21 @@ class ChatService:
         )
         return trimmed_history
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        retry=retry_if_exception_type(
+            (RateLimitError, APIError, APITimeoutError, ConnectionError)
+        ),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retrying request after error: {retry_state.outcome.exception()}"
+        )
+    )
+    async def _invoke_llm(self, messages):
+        """Protected method to invoke LLM with retries"""
+        await self.rate_limiter.acquire()
+        return await self.llm.ainvoke(messages)
+
     async def process_message(
         self, message: str, user_id: str, history: List[Dict]
     ) -> str:
@@ -100,14 +147,20 @@ class ChatService:
             )
             logger.debug(f"Formatted messages for LLM")
 
-            # Run chain
+            # Run chain with rate limiting and retries
             logger.info("Invoking LLM")
-            response = await self.llm.ainvoke(messages)
+            response = await self._invoke_llm(messages)
             logger.debug(f"Raw LLM response: {response}")
 
             logger.info(f"Successfully processed message for user {user_id}")
             return response.content
 
+        except RateLimitError as e:
+            logger.error("Rate limit exceeded", exc_info=True)
+            raise HTTPException(
+                status_code=429,
+                detail="Rate limit exceeded. Please try again later."
+            )
         except Exception as e:
             logger.error(f"Error in process_message: {str(e)}", exc_info=True)
             raise
