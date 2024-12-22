@@ -77,8 +77,7 @@ async def chat_endpoint(message: Message):
     Process a chat message through the following steps:
     1. Get conversation history from DB
     2. Generate AI response using LangChain
-    3. Store conversation in DB
-    4. Return response
+    3. Return response
     """
     logger.info(f"Processing chat message for user {message.user_id}")
     try:
@@ -90,23 +89,6 @@ async def chat_endpoint(message: Message):
         logger.debug("Processing message with LangChain")
         response = await app.chat_service.process_message(
             message.content, message.user_id, history
-        )
-
-        # Store both user message and response
-        logger.debug("Storing conversation in DB")
-        await app.db_client.store_message(
-            user_id=message.user_id,
-            content=message.content,
-            sender="user",
-            message_type=message.message_type,
-            timestamp=message.timestamp,
-        )
-        await app.db_client.store_message(
-            user_id=message.user_id,
-            content=response,
-            sender="assistant",
-            message_type="text",
-            timestamp=datetime.utcnow(),
         )
 
         logger.info(f"Successfully processed message for user {message.user_id}")
