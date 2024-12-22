@@ -34,15 +34,14 @@ Request:
 {
     "content": "string",      // Message content
     "user_id": "string",      // WhatsApp number
-    "message_type": "text"    // Message type
+    "message_type": "text"    // Message type (optional)
 }
 ```
 
 Response:
 ```json
 {
-    "response": "string",     // AI generated response
-    "timestamp": "string"     // ISO-8601 format
+    "response": "string"      // AI generated response
 }
 ```
 
@@ -52,7 +51,7 @@ Response:
 
 Parameters:
 - `user_id`: string (WhatsApp number)
-- `limit`: integer (optional, default: 10)
+- `limit`: integer (optional, default: 20)
 
 Response:
 ```json
@@ -64,7 +63,8 @@ Response:
             "message_type": "text",
             "timestamp": "string"
         }
-    ]
+    ],
+    "user_id": "string"
 }
 ```
 
@@ -74,50 +74,46 @@ Response:
 ```python
 class Message:
     content: str             # Message content
-    sender: str             # user_id or "assistant"
-    timestamp: datetime     # Message timestamp
+    user_id: str            # WhatsApp number
     message_type: str       # Default: "text"
+    timestamp: datetime     # Message timestamp (optional)
 ```
 
-### 2. Conversation Model
+### 2. ChatResponse Model
 ```python
-class Conversation:
-    id: ObjectId           # MongoDB document ID
-    user_id: str          # WhatsApp number
-    title: str            # Optional, defaults to "Chat with {user_id}"
-    participants: List[str] # List of participants
-    messages: List[Message] # Conversation messages
-    created_at: datetime   # Creation timestamp
-    updated_at: datetime   # Last update timestamp
+class ChatResponse:
+    response: str          # AI generated response
 ```
 
 ## API Endpoints
 
-### WhatsApp Service
-
-1. `GET /whatsapp`
-   - Webhook verification for WhatsApp API
-   - Query params: `hub.mode`, `hub.verify_token`, `hub.challenge`
-
-2. `POST /whatsapp`
-   - Webhook for incoming messages
-   - Handles message processing and response
-
-3. `GET /health`
-   - Health check endpoint
-   - Returns service status
-
-### OpenAI Service
+### WhatsApp Service (Port 8501)
 
 1. `POST /chat`
-   - Process messages with AI
+   - Process messages through the service
    - Returns AI-generated responses
+   - Handles message storage
 
 2. `GET /health`
    - Health check endpoint
-   - Returns service status
+   - Verifies connections to other services
 
-### DB Service
+### OpenAI Service (Port 8502)
+
+1. `POST /chat`
+   - Process messages with AI
+   - Stores conversation history
+   - Returns AI-generated responses
+
+2. `GET /conversations/{user_id}`
+   - Retrieve conversation history
+   - Supports pagination with limit parameter
+
+3. `GET /health`
+   - Health check endpoint
+   - Verifies OpenAI API configuration
+
+### DB Service (Port 8000)
 
 1. `POST /api/v1/conversations/messages`
    - Store new messages
@@ -137,11 +133,7 @@ class Conversation:
 
 - 200: Success
 - 400: Bad Request (invalid input)
-- 401: Unauthorized (invalid token)
-- 403: Forbidden (invalid verification)
-- 404: Not Found
 - 500: Internal Server Error
-- 503: Service Unavailable
 
 ### Error Response Format
 ```json
@@ -169,26 +161,44 @@ restartPolicyMaxRetries = 3
 
 ### Environment Variables
 
-Production URLs format:
-- Internal: `https://{service-name}.railway.internal`
-- External: `https://{service-name}-production.up.railway.app`
+#### WhatsApp Service
+```env
+WHATSAPP_VERIFY_TOKEN=token
+WHATSAPP_ACCESS_TOKEN=token
+WHATSAPP_API_URL=url
+OPENAI_SERVICE_URL=http://openai-service:8502
+DB_SERVICE_URL=http://db-service:8000/api/v1
+```
+
+#### OpenAI Service
+```env
+OPENAI_API_KEY=your_api_key
+DB_SERVICE_URL=http://db-service:8000/api/v1
+```
+
+#### DB Service
+```env
+MONGODB_USER=user
+MONGODB_PASSWORD=password
+MONGODB_HOST=mongodb.host
+```
 
 ### Health Checks
 
 Each service implements a `/health` endpoint that checks:
 1. Service status
-2. Database connection (if applicable)
-3. External service connections
+2. External service connections (WhatsApp Service)
+3. Database connection (DB Service)
+4. OpenAI API configuration (OpenAI Service)
 
 Response format:
 ```json
 {
     "status": "healthy",
-    "database": "connected",
-    "service": "running"
+    "environment": "production|development",
+    "additional_info": {}
 }
 ```
-
 ## Development Guidelines
 
 ### Message Processing Flow

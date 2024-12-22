@@ -7,21 +7,24 @@ Este proyecto implementa un asistente educativo a través de WhatsApp utilizando
 El sistema está compuesto por tres microservicios:
 
 1. WhatsApp Service (Puerto 8501)
-   - Gestiona la integración con la API de WhatsApp
-   - Enruta los mensajes al Servicio de OpenAI
-   - Envía respuestas a los usuarios
+   - Gestiona la comunicación con otros servicios
+   - Procesa y enruta los mensajes
+   - Maneja el almacenamiento de mensajes
+   - Endpoint principal: `/chat`
    - Endpoint de salud: `/health`
 
 2. OpenAI Service (Puerto 8502)
    - Procesa los mensajes usando LangChain
-   - Mantiene el contexto de la conversación
+   - Mantiene el historial de conversaciones
    - Genera respuestas con IA
+   - Endpoints principales: `/chat`, `/conversations/{user_id}`
    - Endpoint de salud: `/health`
 
 3. DB Service (Puerto 8000)
    - Almacena el historial de conversaciones
    - Gestiona la persistencia de mensajes
-   - Proporciona recuperación de conversaciones
+   - API REST para gestión de datos
+   - Endpoints principales: `/api/v1/conversations/*`
    - Endpoint de salud: `/health`
 
 ### Flujo de Mensajes
@@ -33,12 +36,11 @@ sequenceDiagram
     participant D as DB Service
     
     U->>W: Envía mensaje
-    W->>D: Almacena mensaje (user)
-    W->>O: Solicita procesamiento
+    W->>O: Procesa mensaje
     O->>D: Obtiene historial
-    O->>O: Procesa con IA
+    O-->>O: Procesa con IA
+    O->>D: Almacena mensaje
     O-->>W: Retorna respuesta
-    W->>D: Almacena respuesta (assistant)
     W->>U: Envía respuesta
 ```
 
@@ -50,9 +52,7 @@ Los mensajes siguen un formato estándar en todo el sistema:
 {
     "user_id": "string",      # ID del usuario (número de WhatsApp)
     "content": "string",      # Contenido del mensaje
-    "sender": "string",       # "user_id" o "assistant"
-    "message_type": "text",   # Tipo de mensaje
-    "timestamp": "ISO-8601"   # Marca de tiempo
+    "message_type": "text",   # Tipo de mensaje (opcional)
 }
 ```
 
@@ -141,9 +141,11 @@ docker compose -f compose.yml -f compose.override.yml up
 
 ## Monitoreo y Salud
 
-- Cada servicio expone un endpoint `/health`
-- Railway monitorea la salud automáticamente
-- Logs disponibles en el dashboard de Railway
+Cada servicio expone un endpoint `/health` que verifica:
+- Estado del servicio
+- Conexiones a servicios externos (WhatsApp Service)
+- Conexión a base de datos (DB Service)
+- Configuración de OpenAI API (OpenAI Service)
 
 ## Contribución
 
